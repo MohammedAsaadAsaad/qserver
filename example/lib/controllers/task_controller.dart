@@ -21,16 +21,7 @@ class TaskController {
     final tasks = await provider.select();
 
     // Convert the StandardDbModels into JSON maps
-    final taskData = tasks
-        .map(
-          (t) => {
-            'id': t.id.value,
-            'title': t.title.value,
-            'description': t.description.value,
-            'status': t.status.value,
-          },
-        )
-        .toList();
+    final taskData = tasks.map((t) => t.toMap()).toList();
 
     return QudsResponse.json({
       'message': 'Tasks retrieved successfully',
@@ -51,11 +42,7 @@ class TaskController {
     // 2. Save using the Quds DB Provider
     await provider.insertEntry(task);
 
-    final responsePayload = {
-      'id': task.id.value,
-      'title': task.title.value,
-      'status': task.status.value,
-    };
+    final responsePayload = task.toMap();
 
     // 3. Queue and Broadcast
     Queue.push(ProcessTaskJob(responsePayload));

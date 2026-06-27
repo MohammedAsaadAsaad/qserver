@@ -100,7 +100,7 @@ class QudsServerApp {
       });
     }
 
-    final host = env<String>('APP_HOST') ?? defaultHost ?? 'localhost';
+    final host = env<String>('APP_HOST') ?? InternetAddress.anyIPv4.address;
     final port = env<int>('APP_PORT') ?? defaultPort ?? 8000;
 
     final server = await HttpServer.bind(host, port);

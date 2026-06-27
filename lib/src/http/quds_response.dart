@@ -1,6 +1,16 @@
 import 'dart:convert';
 import 'dart:io';
 
+/// Encodes an object to JSON, formatting DateTime instances to ISO-8601 strings.
+String qudsJsonEncode(dynamic object) {
+  return jsonEncode(object, toEncodable: (nonEncodable) {
+    if (nonEncodable is DateTime) {
+      return nonEncodable.toIso8601String();
+    }
+    return nonEncodable.toString();
+  });
+}
+
 /// A fluent, easy-to-use builder for HTTP Responses
 class QudsResponse {
   final int statusCode;
@@ -13,14 +23,14 @@ class QudsResponse {
   QudsResponse({
     this.statusCode = 200,
     this.body = '',
-    this.headers = const {},
-  });
+    Map<String, String> headers = const {},
+  }) : headers = Map<String, String>.from(headers);
 
   /// Instantly creates a correctly formatted JSON response
   factory QudsResponse.json(Map<String, dynamic> data, {int status = 200}) {
     return QudsResponse(
       statusCode: status,
-      body: jsonEncode(data),
+      body: qudsJsonEncode(data),
       headers: {'Content-Type': 'application/json; charset=utf-8'},
     );
   }

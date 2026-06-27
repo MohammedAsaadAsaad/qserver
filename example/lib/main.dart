@@ -25,11 +25,13 @@ void main() async {
   final taskController = TaskController();
 
   app.welcomeHeading = 'Welcome to Quds Task Manager API!';
-  app.welcomeSubheading = 'Use this premium console to monitor server metrics, manage tasks, and trigger background worker executions.';
+  app.welcomeSubheading =
+      'Use this premium console to monitor server metrics, manage tasks, and trigger background worker executions.';
   app.welcomeCards = [
     DashboardCard(
       title: 'Developer Portal',
-      content: 'This application is a demo project showcasing database migration, asynchronous queuing, event broadcasting via websockets, and robust request routing.',
+      content:
+          'This application is a demo project showcasing database migration, asynchronous queuing, event broadcasting via websockets, and robust request routing.',
     ),
   ];
 

@@ -1,13 +1,12 @@
-// import 'dart:io' show Platform;
-// import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'dart:io' show Platform;
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import '../container/service_provider.dart';
 import '../container/quds_container.dart';
 import '../container/quds_env.dart';
 
-// import 'package:quds_db_interface/quds_db_interface.dart';
+import 'package:quds_db_interface/quds_db_interface.dart';
 import 'package:quds_db_postgres/quds_db_postgres.dart';
 import 'package:quds_db_mysql/quds_db_mysql.dart';
-// import 'package:quds_db_sqlite/quds_db_sqlite.dart';
 
 class DatabaseServiceProvider extends ServiceProvider {
   @override
@@ -55,22 +54,9 @@ class DatabaseServiceProvider extends ServiceProvider {
           connection = await adapter.getConnection() as MysqlDatabaseConnection;
           break;
 
-        // case 'sqlite':
-        //   // Initialize FFI for server environments
-        //   if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-        //     sqfliteFfiInit();
-        //     databaseFactory = databaseFactoryFfi;
-        //   }
-        //   adapter = SqliteDatabaseAdapter();
-        //   await adapter.initialize(
-        //     SqliteDatabaseSettings(
-        //       dbName: env<String>('DB_DATABASE', 'database.sqlite')!,
-        //       version: 1,
-        //     ),
-        //   );
-        //   connection =
-        //       await adapter.getConnection() as SqliteDatabaseConnection;
-        //   break;
+        case 'sqlite':
+          throw Exception(
+              "SQLite is not supported directly in the qserver backend package because it requires the Flutter SDK. Use postgres or mysql, or import quds_db_sqlite package in your application.");
 
         default:
           throw Exception("Unsupported DB_CONNECTION: $connectionType");

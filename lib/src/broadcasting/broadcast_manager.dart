@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import '../http/auth/auth.dart';
+import '../http/quds_response.dart';
 
 typedef ChannelAuthCallback =
     Future<bool> Function(Map<String, dynamic>? user, String channelName);
@@ -47,6 +48,12 @@ class BroadcastManager {
 
       if (event == 'subscribe' && channel != null) {
         await _subscribeToChannel(socket, channel, token);
+      } else if (event == 'publish' && channel != null) {
+        final eventName = data['name'];
+        final eventData = data['data'];
+        if (eventName != null && eventData is Map<String, dynamic>) {
+          emit(channel, eventName, eventData);
+        }
       }
     } catch (e) {
       // Ignore malformed messages
@@ -97,7 +104,7 @@ class BroadcastManager {
   /// Pushes an event payload to all clients connected to a specific channel
   void emit(String channel, String event, Map<String, dynamic> data) {
     if (_channels.containsKey(channel)) {
-      final payload = jsonEncode({
+      final payload = qudsJsonEncode({
         'channel': channel,
         'event': event,
         'data': data,
