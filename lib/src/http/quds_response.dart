@@ -5,7 +5,7 @@ import 'dart:io';
 String qudsJsonEncode(dynamic object) {
   return jsonEncode(object, toEncodable: (nonEncodable) {
     if (nonEncodable is DateTime) {
-      return nonEncodable.toIso8601String();
+      return nonEncodable.toUtc().toIso8601String();
     }
     return nonEncodable.toString();
   });

@@ -1,6 +1,6 @@
 name: qserver
 description: A comprehensive, expressive, and type-safe Dart backend framework.
-version: 0.0.4
+version: 0.0.5
 # publish_to: none
 homepage: https://github.com/MohammedAsaadAsaad/qserver
 repository: https://github.com/MohammedAsaadAsaad/qserver
@@ -15,7 +15,6 @@ dependencies:
   quds_db_interface: ^0.0.3
   quds_db_postgres: ^0.0.5
   quds_db_mysql: ^0.0.8
-  sqflite_common_ffi: ^2.3.0
 
 dev_dependencies:
   lints: ^3.0.0

@@ -1,0 +1,7 @@
+# Exclude the full-stack demo app from the published package.
+# It is a standalone Flutter + backend showcase and is not needed by consumers.
+example_messaging/
+
+# Never ship compiled executables or stray build artifacts.
+*.exe
+*.exe.old

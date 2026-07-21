@@ -15,7 +15,9 @@ class BroadcastManager {
 
   int get activeConnectionsCount {
     final uniqueSockets = <WebSocket>{};
-    _channels.values.forEach((list) => uniqueSockets.addAll(list));
+    for (final list in _channels.values) {
+      uniqueSockets.addAll(list);
+    }
     return uniqueSockets.length;
   }
 
@@ -49,11 +51,14 @@ class BroadcastManager {
       if (event == 'subscribe' && channel != null) {
         await _subscribeToChannel(socket, channel, token);
       } else if (event == 'publish' && channel != null) {
-        final eventName = data['name'];
-        final eventData = data['data'];
-        if (eventName != null && eventData is Map<String, dynamic>) {
-          emit(channel, eventName, eventData);
-        }
+        // Client-initiated publish is disabled for security.
+        socket.add(
+          jsonEncode({
+            'event': 'publish_error',
+            'channel': channel,
+            'message': 'Client publish is not allowed.',
+          }),
+        );
       }
     } catch (e) {
       // Ignore malformed messages

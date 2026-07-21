@@ -53,7 +53,7 @@ class ServerMonitor {
     
     var pathStr = request.path;
     if (pathStr.length > 37) {
-      pathStr = pathStr.substring(0, 34) + '...';
+      pathStr = '${pathStr.substring(0, 34)}...';
     } else {
       pathStr = pathStr.padRight(37);
     }
