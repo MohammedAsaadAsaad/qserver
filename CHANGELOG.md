@@ -27,3 +27,7 @@
 - Disable the welcome dashboard by default; enable it explicitly with `showWelcomePage = true`.
 - Hide sensitive console diagnostics (env, database, host, metrics, endpoints) unless `APP_ENV` is local/dev.
 - Register `/quds/stats` only when the welcome page is enabled, and return 404 outside local environments.
+
+## 0.0.7
+
+- Update dependencies to latest compatible versions (`dart_jsonwebtoken` 3.x, `mime` 2.x, `lints` 6.x, and Quds DB packages).
