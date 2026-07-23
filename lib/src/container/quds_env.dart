@@ -55,3 +55,9 @@ class QudsEnv {
 
 /// Global helper mirroring Laravel's env() function
 T? env<T>(String key, [T? defaultValue]) => QudsEnv.get<T>(key, defaultValue);
+
+/// True when [APP_ENV] is a local/dev value (default: `local`).
+bool isLocalEnvironment() {
+  final value = (env<String>('APP_ENV', 'local') ?? 'local').toLowerCase();
+  return value == 'local' || value == 'development' || value == 'dev';
+}

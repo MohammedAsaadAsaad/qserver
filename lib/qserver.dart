@@ -38,41 +38,62 @@ class QudsServerApp {
   final QudsRouter router = QudsRouter();
   final List<ServiceProvider> _providers = [];
 
-  bool showWelcomePage = true;
+  /// Opt-in console at `GET /`. Off by default for security.
+  bool showWelcomePage = false;
   String? welcomeHeading;
   String? welcomeSubheading;
   List<DashboardCard>? welcomeCards;
 
   QudsServerApp() {
     QudsContainer.singleton<QudsRouter>(router);
+  }
 
-    router.get('/quds/stats', (request) async {
-      final rssMb = (ProcessInfo.currentRss / (1024 * 1024)).toStringAsFixed(1);
+  void _registerWelcomeRoutes() {
+    if (!router.hasRoute(HttpMethod.get, '/quds/stats')) {
+      router.get('/quds/stats', (request) async {
+        // Never expose runtime internals outside local/dev.
+        if (!isLocalEnvironment()) {
+          return QudsResponse.error('Not found', status: 404);
+        }
 
-      int wsConnections = 0;
-      try {
-        final manager = QudsContainer.resolve<BroadcastManager>();
-        wsConnections = manager.activeConnectionsCount;
-      } catch (_) {}
+        final rssMb =
+            (ProcessInfo.currentRss / (1024 * 1024)).toStringAsFixed(1);
 
-      final uptimeDuration = DateTime.now().difference(_startTime);
-      final h = uptimeDuration.inHours.toString().padLeft(2, '0');
-      final m =
-          uptimeDuration.inMinutes.remainder(60).toString().padLeft(2, '0');
-      final s =
-          uptimeDuration.inSeconds.remainder(60).toString().padLeft(2, '0');
-      final uptimeStr = '$h:$m:$s';
+        int wsConnections = 0;
+        try {
+          final manager = QudsContainer.resolve<BroadcastManager>();
+          wsConnections = manager.activeConnectionsCount;
+        } catch (_) {}
 
-      return QudsResponse.json({
-        'memory': '$rssMb MB',
-        'os': Platform.operatingSystem,
-        'dartVersion': Platform.version.split(' ').first,
-        'processors': Platform.numberOfProcessors,
-        'uptime': uptimeStr,
-        'pid': pid,
-        'wsConnections': wsConnections,
+        final uptimeDuration = DateTime.now().difference(_startTime);
+        final h = uptimeDuration.inHours.toString().padLeft(2, '0');
+        final m =
+            uptimeDuration.inMinutes.remainder(60).toString().padLeft(2, '0');
+        final s =
+            uptimeDuration.inSeconds.remainder(60).toString().padLeft(2, '0');
+        final uptimeStr = '$h:$m:$s';
+
+        return QudsResponse.json({
+          'memory': '$rssMb MB',
+          'os': Platform.operatingSystem,
+          'dartVersion': Platform.version.split(' ').first,
+          'processors': Platform.numberOfProcessors,
+          'uptime': uptimeStr,
+          'pid': pid,
+          'wsConnections': wsConnections,
+        });
       });
-    });
+    }
+
+    if (!router.hasRoute(HttpMethod.get, '/')) {
+      router.get('/', (request) async {
+        return QudsResponse.html(ProjectInfoDashboard.render(
+          welcomeHeading: welcomeHeading,
+          welcomeSubheading: welcomeSubheading,
+          customCards: welcomeCards,
+        ));
+      });
+    }
   }
 
   Future<void> registerProviders(List<ServiceProvider> providers) async {
@@ -90,14 +111,8 @@ class QudsServerApp {
   Future<void> serve({String? defaultHost, int? defaultPort}) async {
     await QudsEnv.load();
 
-    if (showWelcomePage && !router.hasRoute(HttpMethod.get, '/')) {
-      router.get('/', (request) async {
-        return QudsResponse.html(ProjectInfoDashboard.render(
-          welcomeHeading: welcomeHeading,
-          welcomeSubheading: welcomeSubheading,
-          customCards: welcomeCards,
-        ));
-      });
+    if (showWelcomePage) {
+      _registerWelcomeRoutes();
     }
 
     final host = env<String>('APP_HOST') ?? InternetAddress.anyIPv4.address;

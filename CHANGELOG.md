@@ -21,3 +21,9 @@
 - Harden broadcasting: reject client-initiated `publish` messages over WebSockets; events can only be emitted from the server.
 - Remove the unused `sqflite_common_ffi` dependency and clean up unused imports.
 - Resolve all static analysis issues in the library.
+
+## 0.0.6
+
+- Disable the welcome dashboard by default; enable it explicitly with `showWelcomePage = true`.
+- Hide sensitive console diagnostics (env, database, host, metrics, endpoints) unless `APP_ENV` is local/dev.
+- Register `/quds/stats` only when the welcome page is enabled, and return 404 outside local environments.

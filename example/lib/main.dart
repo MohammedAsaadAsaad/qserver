@@ -24,6 +24,7 @@ void main() async {
   // 4. Define HTTP Routes
   final taskController = TaskController();
 
+  app.showWelcomePage = true;
   app.welcomeHeading = 'Welcome to Quds Task Manager API!';
   app.welcomeSubheading =
       'Use this premium console to monitor server metrics, manage tasks, and trigger background worker executions.';

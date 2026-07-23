@@ -24,11 +24,8 @@ class ProjectInfoDashboard {
     String? customHtml,
   }) {
     final appName = env<String>('APP_NAME', 'Quds Server Project')!;
-    final appEnv = env<String>('APP_ENV', 'local')!;
-    final appHost = env<String>('APP_HOST', '0.0.0.0')!;
-    final appPort = env<int>('APP_PORT', 8000)!;
-    final dbConnection = env<String>('DB_CONNECTION', 'postgres')!;
-    final dbDatabase = env<String>('DB_DATABASE', 'quds_example_db')!;
+    // Diagnostics (env, DB, host, live metrics, route map) stay local-only.
+    final showDiagnostics = isLocalEnvironment();
 
     final finalWelcomeHeading = welcomeHeading ?? "Welcome to $appName";
     final finalWelcomeSubheading = welcomeSubheading ??
@@ -58,28 +55,13 @@ class ProjectInfoDashboard {
       }
     }
 
-    // Render endpoints
-    final endpointsBuffer = StringBuffer();
-    final endpointsList = endpoints ??
-        [
-          DashboardEndpoint(
-              method: 'GET', path: '/', description: 'Dashboard UI'),
-          DashboardEndpoint(
-              method: 'WS', path: '/ws', description: 'WebSockets'),
-        ];
-
-    for (var ep in endpointsList) {
-      final methodClass = 'method-${ep.method.toLowerCase()}';
-      endpointsBuffer.write("""
-      <div class="endpoint-item">
-        <div class="endpoint-meta">
-          <span class="method-badge $methodClass">${ep.method}</span>
-          <span class="endpoint-path">${ep.path}</span>
-        </div>
-        <span class="endpoint-desc">${ep.description}</span>
-      </div>
-      """);
-    }
+    final systemParamsHtml =
+        showDiagnostics ? _renderSystemParameters() : '';
+    final sidebarHtml =
+        showDiagnostics ? _renderSidebar(endpoints: endpoints) : '';
+    final statsScript = showDiagnostics ? _statsScript : '';
+    final gridClass =
+        showDiagnostics ? 'dashboard-grid' : 'dashboard-grid public-only';
 
     return """
 <!DOCTYPE html>
@@ -87,7 +69,7 @@ class ProjectInfoDashboard {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>$appName - Quds Server Console</title>
+  <title>$appName</title>
   
   <!-- Premium Typography -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -255,6 +237,11 @@ class ProjectInfoDashboard {
       display: grid;
       grid-template-columns: 2fr 1fr;
       gap: 1.75rem;
+    }
+
+    .dashboard-grid.public-only {
+      grid-template-columns: 1fr;
+      max-width: 720px;
     }
     
     @media (max-width: 968px) {
@@ -437,7 +424,7 @@ class ProjectInfoDashboard {
             <h1>$appName</h1>
             <span>v0.0.1</span>
           </div>
-          <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.15rem;">Quds Dart Server Framework Console</p>
+          <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.15rem;">Quds Dart Server Framework</p>
         </div>
       </div>
       <div class="system-status">
@@ -448,7 +435,7 @@ class ProjectInfoDashboard {
       </div>
     </header>
     
-    <div class="dashboard-grid">
+    <div class="$gridClass">
       <!-- Main Column -->
       <div style="display: flex; flex-direction: column; gap: 1.75rem;">
         
@@ -463,7 +450,30 @@ class ProjectInfoDashboard {
         <!-- Custom Cards Hook -->
         $cardsBuffer
         
-        <!-- Config Overview -->
+        $systemParamsHtml
+        
+        <!-- Custom HTML Injection Hook -->
+        ${customHtml ?? ''}
+      </div>
+      
+      $sidebarHtml
+    </div>
+  </div>
+  
+  $statsScript
+</body>
+</html>
+""";
+  }
+
+  static String _renderSystemParameters() {
+    final appEnv = env<String>('APP_ENV', 'local')!;
+    final appHost = env<String>('APP_HOST', '0.0.0.0')!;
+    final appPort = env<int>('APP_PORT', 8000)!;
+    final dbConnection = env<String>('DB_CONNECTION', 'postgres')!;
+    final dbDatabase = env<String>('DB_DATABASE', 'quds_example_db')!;
+
+    return """
         <section class="card">
           <h2 class="card-title">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
@@ -491,15 +501,34 @@ class ProjectInfoDashboard {
             </div>
           </div>
         </section>
-        
-        <!-- Custom HTML Injection Hook -->
-        ${customHtml ?? ''}
+    """;
+  }
+
+  static String _renderSidebar({List<DashboardEndpoint>? endpoints}) {
+    final endpointsBuffer = StringBuffer();
+    final endpointsList = endpoints ??
+        [
+          DashboardEndpoint(
+              method: 'GET', path: '/', description: 'Dashboard UI'),
+          DashboardEndpoint(
+              method: 'WS', path: '/ws', description: 'WebSockets'),
+        ];
+
+    for (var ep in endpointsList) {
+      final methodClass = 'method-${ep.method.toLowerCase()}';
+      endpointsBuffer.write("""
+      <div class="endpoint-item">
+        <div class="endpoint-meta">
+          <span class="method-badge $methodClass">${ep.method}</span>
+          <span class="endpoint-path">${ep.path}</span>
+        </div>
+        <span class="endpoint-desc">${ep.description}</span>
       </div>
-      
-      <!-- Sidebar Column -->
+      """);
+    }
+
+    return """
       <div style="display: flex; flex-direction: column; gap: 1.75rem;">
-        
-        <!-- Live metrics -->
         <section class="card">
           <h2 class="card-title">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
@@ -528,8 +557,7 @@ class ProjectInfoDashboard {
             </div>
           </div>
         </section>
-        
-        <!-- API Route Directory -->
+
         <section class="card">
           <h2 class="card-title">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
@@ -541,15 +569,16 @@ class ProjectInfoDashboard {
             $endpointsBuffer
           </div>
         </section>
-        
       </div>
-    </div>
-  </div>
-  
+    """;
+  }
+
+  static const String _statsScript = """
   <script>
     async function updateStats() {
       try {
         const response = await fetch('/quds/stats');
+        if (!response.ok) return;
         const data = await response.json();
         
         document.getElementById('memValue').textContent = data.memory;
@@ -564,8 +593,5 @@ class ProjectInfoDashboard {
     setInterval(updateStats, 2000);
     updateStats();
   </script>
-</body>
-</html>
 """;
-  }
 }
