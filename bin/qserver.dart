@@ -48,6 +48,26 @@ void main(List<String> arguments) async {
       }
       _makeJob(arguments[1]);
       break;
+    case 'make:middleware':
+      if (arguments.length < 2) {
+        print('Error: Please provide a middleware name.');
+        return;
+      }
+      _makeMiddleware(arguments[1]);
+      break;
+    case 'make:provider':
+      if (arguments.length < 2) {
+        print('Error: Please provide a provider name.');
+        return;
+      }
+      _makeProvider(arguments[1]);
+      break;
+    case 'cache:clear':
+      print(
+        'Cache.flush() clears the in-process cache at runtime.\n'
+        'Call Cache.flush() from your app code, or restart the server.',
+      );
+      break;
     default:
       print('Unknown command: $command');
       _printHelp();
@@ -57,12 +77,15 @@ void main(List<String> arguments) async {
 void _printHelp() {
   print('Quds Server CLI (qserver)');
   print('Usage:');
-  print('  qserver create <name>      Scaffolds a new Quds project');
-  print('  qserver serve              Starts the HTTP server');
-  print('  qserver make:controller    Creates a new Controller');
-  print('  qserver make:model         Creates a new Model');
-  print('  qserver make:request       Creates a new Request class');
-  print('  qserver make:job           Creates a new Background Job');
+  print('  qserver create <name>         Scaffolds a new Quds project');
+  print('  qserver serve                 Starts the HTTP server');
+  print('  qserver make:controller       Creates a new Controller');
+  print('  qserver make:model            Creates a new Model');
+  print('  qserver make:request          Creates a new Request class');
+  print('  qserver make:job              Creates a new Background Job');
+  print('  qserver make:middleware       Creates a new Middleware');
+  print('  qserver make:provider         Creates a new Service Provider');
+  print('  qserver cache:clear           Shows how to flush the cache');
 }
 
 // ==========================================
@@ -130,7 +153,8 @@ void main() async {
 
   // 2. Apply Global Middleware
   app.router.use(CorsMiddleware());
-  app.router.use(LoggerMiddleware()); // Visual terminal monitor
+  app.router.use(LoggerMiddleware()); // Live traffic + timestamps in the terminal
+  app.router.use(ExceptionHandlerMiddleware()); // Catch, log, and review exceptions
 
   // 3. Configure WebSocket Channels
   Broadcast.channel('public.tasks', (user, channel) async {
@@ -467,4 +491,62 @@ class $name extends Job {
 
   file.writeAsStringSync(template);
   print('Job [$name] created successfully at ${file.path}');
+}
+
+void _makeMiddleware(String name) {
+  final dir = Directory('lib/middleware');
+  if (!dir.existsSync()) dir.createSync(recursive: true);
+
+  final file = File('${dir.path}/${name.toLowerCase()}.dart');
+  if (file.existsSync()) {
+    print('Warning: Middleware $name already exists.');
+    return;
+  }
+
+  final template = '''
+import 'package:qserver/qserver.dart';
+
+class $name extends Middleware {
+  @override
+  Future<QudsResponse> handle(QudsRequest request, NextMiddleware next) async {
+    // Before the next middleware / handler
+    final response = await next(request);
+    // After the response
+    return response;
+  }
+}
+''';
+
+  file.writeAsStringSync(template);
+  print('Middleware [$name] created successfully at ${file.path}');
+}
+
+void _makeProvider(String name) {
+  final dir = Directory('lib/providers');
+  if (!dir.existsSync()) dir.createSync(recursive: true);
+
+  final file = File('${dir.path}/${name.toLowerCase()}.dart');
+  if (file.existsSync()) {
+    print('Warning: Provider $name already exists.');
+    return;
+  }
+
+  final template = '''
+import 'package:qserver/qserver.dart';
+
+class $name extends ServiceProvider {
+  @override
+  void register() {
+    // Bind services into the container here
+  }
+
+  @override
+  Future<void> boot() async {
+    // Start background work after all providers are registered
+  }
+}
+''';
+
+  file.writeAsStringSync(template);
+  print('Provider [$name] created successfully at ${file.path}');
 }

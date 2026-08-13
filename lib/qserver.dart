@@ -8,13 +8,16 @@ export 'src/http/middleware.dart';
 export 'src/container/quds_mapper.dart';
 export 'src/container/quds_container.dart';
 export 'src/container/service_provider.dart';
-export 'src/container/quds_env.dart'; // Export the env helper
+export 'src/container/quds_env.dart';
 export 'src/routing/router.dart';
 export 'src/routing/route.dart';
 export 'src/http/quds_form_request.dart';
 export 'src/http/middleware/cors_middleware.dart';
 export 'src/http/middleware/logger_middleware.dart';
+export 'src/http/middleware/exception_handler_middleware.dart';
+export 'src/http/middleware/rate_limit_middleware.dart';
 export 'src/exceptions/exception_handler.dart';
+export 'src/exceptions/exception_log.dart';
 export 'src/storage/storage.dart';
 export 'src/http/uploaded_file.dart';
 export 'src/http/auth/auth.dart';
@@ -29,6 +32,11 @@ export 'src/http/middleware/server_monitor.dart';
 export 'src/database/database_provider.dart';
 export 'src/http/dashboard.dart';
 export 'src/http/validator.dart';
+export 'src/cache/cache.dart';
+export 'src/cache/cache_driver.dart';
+export 'src/cache/memory_cache_driver.dart';
+export 'src/logging/quds_log.dart';
+export 'src/testing/quds_test_client.dart';
 export 'package:quds_db_interface/quds_db_interface.dart';
 export 'package:quds_db_postgres/quds_db_postgres.dart';
 export 'package:quds_db_mysql/quds_db_mysql.dart';
@@ -46,6 +54,9 @@ class QudsServerApp {
 
   QudsServerApp() {
     QudsContainer.singleton<QudsRouter>(router);
+    if (!QudsContainer.isRegistered<CacheDriver>()) {
+      QudsContainer.singleton<CacheDriver>(MemoryCacheDriver());
+    }
   }
 
   void _registerWelcomeRoutes() {
@@ -96,6 +107,40 @@ class QudsServerApp {
     }
   }
 
+  void _registerHealthRoutes() {
+    if (!router.hasRoute(HttpMethod.get, '/quds/health')) {
+      router.get('/quds/health', (request) async {
+        return QudsResponse.json({'status': 'ok'});
+      });
+    }
+
+    if (!router.hasRoute(HttpMethod.get, '/quds/ready')) {
+      router.get('/quds/ready', (request) async {
+        // Plan: not registered or unusable DB connection => 503.
+        if (!QudsContainer.isRegistered<DatabaseConnection>()) {
+          return QudsResponse.json({
+            'status': 'not_ready',
+            'database': 'not_configured',
+          }, status: 503);
+        }
+
+        try {
+          QudsContainer.resolve<DatabaseConnection>();
+          return QudsResponse.json({
+            'status': 'ready',
+            'database': 'ok',
+          });
+        } catch (e) {
+          return QudsResponse.json({
+            'status': 'not_ready',
+            'database': 'error',
+            'message': e.toString(),
+          }, status: 503);
+        }
+      });
+    }
+  }
+
   Future<void> registerProviders(List<ServiceProvider> providers) async {
     await QudsEnv.load();
     _providers.addAll(providers);
@@ -110,6 +155,8 @@ class QudsServerApp {
   /// Starts the HTTP Server, pulling configs from the .env file automatically
   Future<void> serve({String? defaultHost, int? defaultPort}) async {
     await QudsEnv.load();
+
+    _registerHealthRoutes();
 
     if (showWelcomePage) {
       _registerWelcomeRoutes();

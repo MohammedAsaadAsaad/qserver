@@ -3,6 +3,12 @@ abstract class Job {
   /// The logic that will be executed in the background
   Future<void> handle();
 
-  /// Optional: How many times to retry the job if it fails
+  /// How many times to retry the job if it fails
   int get maxRetries => 3;
+
+  /// How many times this job has already been attempted
+  int attempts = 0;
+
+  /// When the job becomes eligible to run (`null` = immediately)
+  DateTime? availableAt;
 }

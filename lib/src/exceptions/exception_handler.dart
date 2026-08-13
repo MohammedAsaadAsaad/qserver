@@ -1,12 +1,56 @@
+import '../http/middleware/server_monitor.dart';
 import '../http/quds_request.dart';
 import '../http/quds_response.dart';
-import '../routing/router.dart'; // To access validation/auth exceptions
+import '../routing/router.dart';
+import '../container/quds_env.dart';
+import 'exception_log.dart';
 
-/// A centralized hub for formatting and returning application errors
+/// A centralized hub for formatting and returning application errors.
 class GlobalExceptionHandler {
-  /// Translates a Dart Exception into a clean HTTP Response
-  static QudsResponse handle(Exception error, QudsRequest? request) {
-    // 1. Handle Validation Errors (422)
+  /// True for validation / authorization failures that are part of normal flow.
+  static bool isExpected(Object error) {
+    return error is QudsValidationException ||
+        error is QudsAuthorizationException;
+  }
+
+  static int statusOf(Object error) {
+    if (error is QudsValidationException) return 422;
+    if (error is QudsAuthorizationException) return 403;
+    return 500;
+  }
+
+  /// Translates a thrown error into a clean HTTP response, and records
+  /// unexpected exceptions for later review.
+  static QudsResponse handle(
+    Object error, {
+    StackTrace? stackTrace,
+    QudsRequest? request,
+    bool logExpected = false,
+  }) {
+    if (!isExpected(error) || logExpected) {
+      ExceptionLog.add(
+        QudsExceptionRecord.capture(
+          error,
+          stackTrace ?? StackTrace.current,
+          request,
+        ),
+      );
+      ServerMonitor.refresh();
+    }
+
+    return toResponse(
+      error,
+      request: request,
+      stackTrace: stackTrace,
+    );
+  }
+
+  /// Maps an error to an HTTP response without writing to [ExceptionLog].
+  static QudsResponse toResponse(
+    Object error, {
+    QudsRequest? request,
+    StackTrace? stackTrace,
+  }) {
     if (error is QudsValidationException) {
       return QudsResponse.json({
         'message': 'The given data was invalid.',
@@ -14,18 +58,34 @@ class GlobalExceptionHandler {
       }, status: 422);
     }
 
-    // 2. Handle Authorization Errors (403)
     if (error is QudsAuthorizationException) {
       return QudsResponse.error(error.message, status: 403);
     }
 
-    // 3. Handle Generic/Unhandled Server Crashes (500)
-    // In a real app, we check if APP_DEBUG is true to show the stack trace
-    print('\x1B[31m[CRITICAL ERROR] ${error.toString()}\x1B[0m');
+    final debug = isLocalEnvironment();
+    final payload = <String, dynamic>{
+      'error': true,
+      'message': debug
+          ? error.toString()
+          : 'Internal Server Error. Please contact the administrator.',
+    };
 
-    return QudsResponse.error(
-      "Internal Server Error. Please contact the administrator.",
-      status: 500,
-    );
+    if (debug) {
+      payload['type'] = error.runtimeType.toString();
+      if (request != null) {
+        payload['method'] = request.method;
+        payload['path'] = request.pathAndQuery;
+      }
+      if (stackTrace != null) {
+        payload['trace'] = stackTrace
+            .toString()
+            .split('\n')
+            .where((line) => line.trim().isNotEmpty)
+            .take(12)
+            .toList();
+      }
+    }
+
+    return QudsResponse.json(payload, status: 500);
   }
 }

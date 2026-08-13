@@ -1,3 +1,5 @@
+import '../logging/quds_log.dart';
+import 'job.dart';
 import 'queue_driver.dart';
 
 class QueueWorker {
@@ -9,24 +11,38 @@ class QueueWorker {
   /// Starts the infinite background loop
   void start() async {
     _isRunning = true;
-    print('👷 Quds Queue Worker started and listening for jobs...');
+    Log.info('Quds Queue Worker started and listening for jobs...');
 
     while (_isRunning) {
       final job = await _driver.pop();
 
       if (job != null) {
         try {
-          // Execute the job's logic
+          job.attempts += 1;
           await job.handle();
         } catch (e) {
-          // In a real production system, you'd implement the retry logic here
-          // and move it to a "Failed Jobs" database table if it exceeds maxRetries.
-          print('\x1B[31m[JOB FAILED] ${job.runtimeType}: $e\x1B[0m');
+          await _handleFailure(job, e);
         }
       } else {
-        // If the queue is empty, wait 1 second before polling again to prevent CPU spiking
+        // If the queue is empty, wait briefly before polling again
         await Future.delayed(const Duration(seconds: 1));
       }
+    }
+  }
+
+  Future<void> _handleFailure(Job job, Object error) async {
+    if (job.attempts < job.maxRetries) {
+      final backoffSeconds = 1 << (job.attempts - 1); // 1, 2, 4, ...
+      job.availableAt =
+          DateTime.now().add(Duration(seconds: backoffSeconds));
+      Log.warning(
+        'Job ${job.runtimeType} failed (attempt ${job.attempts}/${job.maxRetries}): $error — retry in ${backoffSeconds}s',
+      );
+      await _driver.push(job);
+    } else {
+      Log.error(
+        '[JOB FAILED] ${job.runtimeType} after ${job.attempts} attempts: $error',
+      );
     }
   }
 

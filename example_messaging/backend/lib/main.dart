@@ -20,6 +20,7 @@ Future<void> main() async {
     CorsMiddleware(),
   ); // Crucial for allowing frontend to make HTTP/WS connections
   app.router.use(LoggerMiddleware()); // Terminal visual metrics dashboard
+  app.router.use(ExceptionHandlerMiddleware()); // Catch and persist exceptions
 
   // 3. Configure WebSocket Channels
   Broadcast.channel('chat.*', (user, channel) async {

@@ -9,11 +9,25 @@ abstract class QudsValidator {
   /// The method to be overridden by concrete validators
   String? validateRule(String field, dynamic value);
 
+  /// Optional hook with access to the full payload (used by Confirmed, etc.)
+  String? validateWithData(
+    String field,
+    dynamic value,
+    Map<String, dynamic> data,
+  ) {
+    return validateRule(field, value);
+  }
+
   /// Executes the entire chain of validators
-  List<String> run(String field, dynamic value) {
+  List<String> run(
+    String field,
+    dynamic value, [
+    Map<String, dynamic>? data,
+  ]) {
     final errors = <String>[];
+    final payload = data ?? const <String, dynamic>{};
     for (var validator in _chain) {
-      final error = validator.validateRule(field, value);
+      final error = validator.validateWithData(field, value, payload);
       if (error != null) {
         errors.add(error);
       }
@@ -99,6 +113,80 @@ class MaxRule extends QudsValidator {
   }
 }
 
+class IsInt extends QudsValidator {
+  @override
+  String? validateRule(String field, dynamic value) {
+    if (value == null) return null;
+    if (value is int) return null;
+    if (value is String && int.tryParse(value) != null) return null;
+    return 'The $field must be an integer.';
+  }
+}
+
+class IsBool extends QudsValidator {
+  @override
+  String? validateRule(String field, dynamic value) {
+    if (value == null) return null;
+    if (value is bool) return null;
+    if (value is String) {
+      final v = value.toLowerCase();
+      if (v == 'true' || v == 'false' || v == '1' || v == '0') return null;
+    }
+    if (value is num && (value == 0 || value == 1)) return null;
+    return 'The $field must be a boolean.';
+  }
+}
+
+class IsUrl extends QudsValidator {
+  @override
+  String? validateRule(String field, dynamic value) {
+    if (value == null) return null;
+    final uri = Uri.tryParse(value.toString());
+    if (uri == null || !uri.hasScheme || uri.host.isEmpty) {
+      return 'The $field must be a valid URL.';
+    }
+    return null;
+  }
+}
+
+/// Ensures [field] matches `[field]_confirmation` in the same payload.
+class IsConfirmed extends QudsValidator {
+  @override
+  String? validateRule(String field, dynamic value) {
+    // Without full payload we cannot confirm — ValidationEngine uses validateWithData.
+    return null;
+  }
+
+  @override
+  String? validateWithData(
+    String field,
+    dynamic value,
+    Map<String, dynamic> data,
+  ) {
+    if (value == null) return null;
+    final other = data['${field}_confirmation'];
+    if (value.toString() != other?.toString()) {
+      return 'The $field confirmation does not match.';
+    }
+    return null;
+  }
+}
+
+class InRule extends QudsValidator {
+  final List<dynamic> allowed;
+  InRule(this.allowed);
+
+  @override
+  String? validateRule(String field, dynamic value) {
+    if (value == null) return null;
+    final ok = allowed.any((item) => item?.toString() == value.toString());
+    if (!ok) {
+      return 'The selected $field is invalid.';
+    }
+    return null;
+  }
+}
+
 // ==========================================
 // Extensions for Fluent Chaining
 // ==========================================
@@ -108,6 +196,11 @@ extension QudsValidatorExtensions on QudsValidator {
   QudsValidator max(int length) => and(MaxRule(length));
   QudsValidator isString() => and(IsString());
   QudsValidator isEmail() => and(IsEmail());
+  QudsValidator isInt() => and(IsInt());
+  QudsValidator isBool() => and(IsBool());
+  QudsValidator isUrl() => and(IsUrl());
+  QudsValidator confirmed() => and(IsConfirmed());
+  QudsValidator inList(List<dynamic> values) => and(InRule(values));
 }
 
 // ==========================================
@@ -123,7 +216,7 @@ class ValidationEngine {
 
     rules.forEach((field, validator) {
       final value = data[field];
-      final fieldErrors = validator.run(field, value);
+      final fieldErrors = validator.run(field, value, data);
 
       if (fieldErrors.isNotEmpty) {
         errors[field] = fieldErrors;

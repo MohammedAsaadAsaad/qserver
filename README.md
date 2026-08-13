@@ -12,7 +12,7 @@ qserver provides a complete ecosystem for building server-side applications, fea
 - **Asynchronous Queue Worker**: Offload heavy or slow workloads into background jobs using an asynchronous worker queue.
 - **WebSocket Event Broadcasting**: Broadcast events on private or public channels to real-time clients instantly.
 - **Database Table Providers**: Streamlined database integration using models and table providers powered by PostgreSQL, MySQL, and other DB interfaces.
-- **Developer Command Console**: An interactive terminal dashboard displaying live traffic logs, throughput statistics, average latency trends, and worker status.
+- **Developer Command Console**: An interactive terminal dashboard displaying live traffic logs (time, status, path, duration, client IP), throughput statistics, latency trends, and recent exceptions.
 - **CLI Utility Tool**: Instantly scaffold new projects, make controllers, database models, requests, and background jobs.
 
 ---
@@ -81,6 +81,7 @@ void main() async {
   // Apply global middleware
   app.router.use(CorsMiddleware());
   app.router.use(LoggerMiddleware());
+  app.router.use(ExceptionHandlerMiddleware());
 
   // Define HTTP routes
   final taskController = TaskController();
@@ -127,6 +128,26 @@ class CheckHeaderMiddleware extends Middleware {
   }
 }
 ```
+
+### Exception handling and logs
+
+Register `ExceptionHandlerMiddleware` **after** the logger. It catches errors in the pipeline, converts them to HTTP responses, and stores them so you can review them later (live monitor + `storage/logs/exceptions.log`).
+
+```dart
+app.router.use(LoggerMiddleware());
+app.router.use(ExceptionHandlerMiddleware(
+  handler: (error, stack, request) {
+    if (error is FormatException) {
+      return QudsResponse.error(error.message, status: 400);
+    }
+    return null; // fall back to 422 / 403 / 500
+  },
+));
+```
+
+Unexpected exceptions are always recorded. Validation (422) and authorization (403) failures are not, unless you pass `logExpected: true`. Inspect recent records with `ExceptionLog.recent`, or read the log file at `ExceptionLog.filePath`.
+
+Even without the middleware, `GlobalExceptionHandler` still records unexpected errors that bubble out of `dispatch`.
 
 ### Requests and Input Validation
 

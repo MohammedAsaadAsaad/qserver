@@ -31,6 +31,11 @@ class QudsContainer {
     );
   }
 
+  /// Whether [T] is registered as a singleton or factory.
+  static bool isRegistered<T>() {
+    return _singletons.containsKey(T) || _factories.containsKey(T);
+  }
+
   /// Clears the container (useful for tearing down tests)
   static void clear() {
     _singletons.clear();

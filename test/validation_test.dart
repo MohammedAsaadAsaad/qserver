@@ -57,6 +57,34 @@ void main() {
       expect(rule.run('field', 123), isNotEmpty);
       expect(rule.run('field', null), isNotEmpty);
     });
+
+    test('IsInt IsBool IsUrl InRule Confirmed', () {
+      expect(IsInt().validateRule('age', 10), isNull);
+      expect(IsInt().validateRule('age', '10'), isNull);
+      expect(IsInt().validateRule('age', 'x'), isNotNull);
+
+      expect(IsBool().validateRule('ok', true), isNull);
+      expect(IsBool().validateRule('ok', 'true'), isNull);
+      expect(IsBool().validateRule('ok', 'maybe'), isNotNull);
+
+      expect(IsUrl().validateRule('site', 'https://example.com'), isNull);
+      expect(IsUrl().validateRule('site', 'not-a-url'), isNotNull);
+
+      expect(InRule(['a', 'b']).validateRule('x', 'a'), isNull);
+      expect(InRule(['a', 'b']).validateRule('x', 'c'), isNotNull);
+
+      final errors = ValidationEngine.validate(
+        {'password': 'secret', 'password_confirmation': 'secret'},
+        {'password': IsRequired().confirmed()},
+      );
+      expect(errors, isEmpty);
+
+      final bad = ValidationEngine.validate(
+        {'password': 'secret', 'password_confirmation': 'nope'},
+        {'password': IsRequired().confirmed()},
+      );
+      expect(bad.containsKey('password'), isTrue);
+    });
   });
 
   group('ValidationEngine Tests', () {

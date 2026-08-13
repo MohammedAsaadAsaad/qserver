@@ -6,22 +6,43 @@ abstract class QueueDriver {
   /// Pushes a new job onto the queue
   Future<void> push(Job job);
 
-  /// Retrieves the next job from the queue (FIFO)
+  /// Retrieves the next ready job from the queue (FIFO among ready jobs)
   Future<Job?> pop();
 }
 
 /// A lightweight, in-memory implementation for single-server setups
 class MemoryQueueDriver implements QueueDriver {
-  final Queue<Job> _jobs = Queue<Job>();
+  final ListQueue<Job> _jobs = ListQueue<Job>();
 
   @override
   Future<void> push(Job job) async {
-    _jobs.add(job);
+    _jobs.addLast(job);
   }
 
   @override
   Future<Job?> pop() async {
     if (_jobs.isEmpty) return null;
-    return _jobs.removeFirst();
+
+    final now = DateTime.now();
+    final deferred = <Job>[];
+
+    while (_jobs.isNotEmpty) {
+      final job = _jobs.removeFirst();
+      final availableAt = job.availableAt;
+      if (availableAt == null || !availableAt.isAfter(now)) {
+        // Re-queue jobs that were not yet ready
+        for (final d in deferred) {
+          _jobs.addLast(d);
+        }
+        return job;
+      }
+      deferred.add(job);
+    }
+
+    // Nothing ready — put deferred jobs back
+    for (final d in deferred) {
+      _jobs.addLast(d);
+    }
+    return null;
   }
 }

@@ -14,7 +14,8 @@ void main() async {
 
   // 2. Apply Global Middleware
   app.router.use(CorsMiddleware());
-  app.router.use(LoggerMiddleware()); // Your beautiful visual terminal monitor!
+  app.router.use(LoggerMiddleware()); // Live traffic + timestamps in the terminal
+  app.router.use(ExceptionHandlerMiddleware()); // Catch, log, and review exceptions
 
   // 3. Configure WebSocket Channels
   Broadcast.channel('public.tasks', (user, channel) async {
