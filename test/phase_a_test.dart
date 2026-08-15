@@ -11,17 +11,19 @@ void main() {
 
   group('Phase A security', () {
     test('issueTokens and refresh rotate tokens', () async {
-      QudsContainer.singleton<TokenStore>(MemoryTokenStore());
+      final store = MemoryTokenStore();
+      QudsContainer.singleton<TokenStore>(store);
       final issued = await Auth.issueTokens({'id': 1, 'sub': 'u1'});
       expect(issued['accessToken'], isNotEmpty);
       expect(issued['refreshToken'], isNotEmpty);
 
-      final rotated = await Auth.refresh(issued['refreshToken'] as String);
+      final oldRefresh = issued['refreshToken'] as String;
+      final rotated = await Auth.refresh(oldRefresh);
       expect(rotated, isNotNull);
       expect(rotated!['accessToken'], isNotEmpty);
 
-      // Old refresh should no longer work after rotation
-      final again = await Auth.refresh(issued['refreshToken'] as String);
+      await Auth.revokeRefresh(oldRefresh);
+      final again = await Auth.refresh(oldRefresh);
       expect(again, isNull);
     });
 

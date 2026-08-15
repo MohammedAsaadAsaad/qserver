@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:crypto/crypto.dart';
 import 'package:dart_jsonwebtoken/dart_jsonwebtoken.dart';
 
 import '../../container/quds_container.dart';
@@ -194,9 +195,7 @@ class Auth {
   }
 
   static String _hashToken(String token) {
-    final encoded = base64Url.encode(utf8.encode(token)).replaceAll('=', '');
-    if (encoded.length <= 64) return encoded;
-    return encoded.substring(0, 64);
+    return sha256.convert(utf8.encode(token)).toString();
   }
 
   static String _randomId() {
