@@ -1,12 +1,18 @@
+import '../container/quds_container.dart';
 import '../logging/quds_log.dart';
 import 'job.dart';
 import 'queue_driver.dart';
 
 class QueueWorker {
-  final QueueDriver _driver;
+  /// Optional fixed driver; when null, resolves from [QudsContainer] each poll
+  /// so env-based driver swaps after boot still take effect.
+  final QueueDriver? _fixedDriver;
   bool _isRunning = false;
 
-  QueueWorker(this._driver);
+  QueueWorker([this._fixedDriver]);
+
+  QueueDriver get _driver =>
+      _fixedDriver ?? QudsContainer.resolve<QueueDriver>();
 
   /// Starts the infinite background loop
   void start() async {

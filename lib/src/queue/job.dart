@@ -1,5 +1,8 @@
 /// The base class for all background jobs
 abstract class Job {
+  /// Optional stable id (required for [Queue.cancel] with the database driver).
+  String? id;
+
   /// The logic that will be executed in the background
   Future<void> handle();
 

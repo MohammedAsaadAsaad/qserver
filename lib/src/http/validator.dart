@@ -188,6 +188,63 @@ class InRule extends QudsValidator {
 }
 
 // ==========================================
+// Async / DB-backed rules (opt-in)
+// ==========================================
+
+typedef AsyncFieldCheck = Future<bool> Function(
+  String field,
+  dynamic value,
+  Map<String, dynamic> data,
+);
+
+/// Async validator contract used by [ValidationEngine.validateAsync].
+abstract class AsyncQudsValidator {
+  Future<String?> validate(
+    String field,
+    dynamic value,
+    Map<String, dynamic> data,
+  );
+}
+
+/// Fails when [check] returns true (row already exists).
+class UniqueRule implements AsyncQudsValidator {
+  final AsyncFieldCheck exists;
+  UniqueRule(this.exists);
+
+  @override
+  Future<String?> validate(
+    String field,
+    dynamic value,
+    Map<String, dynamic> data,
+  ) async {
+    if (value == null || value.toString().isEmpty) return null;
+    if (await exists(field, value, data)) {
+      return 'The $field has already been taken.';
+    }
+    return null;
+  }
+}
+
+/// Fails when [check] returns false (row missing).
+class ExistsRule implements AsyncQudsValidator {
+  final AsyncFieldCheck exists;
+  ExistsRule(this.exists);
+
+  @override
+  Future<String?> validate(
+    String field,
+    dynamic value,
+    Map<String, dynamic> data,
+  ) async {
+    if (value == null || value.toString().isEmpty) return null;
+    if (!await exists(field, value, data)) {
+      return 'The selected $field is invalid.';
+    }
+    return null;
+  }
+}
+
+// ==========================================
 // Extensions for Fluent Chaining
 // ==========================================
 
@@ -223,6 +280,21 @@ class ValidationEngine {
       }
     });
 
+    return errors;
+  }
+
+  static Future<Map<String, List<String>>> validateAsync(
+    Map<String, dynamic> data,
+    Map<String, AsyncQudsValidator> asyncRules,
+  ) async {
+    final Map<String, List<String>> errors = {};
+    for (final entry in asyncRules.entries) {
+      final field = entry.key;
+      final error = await entry.value.validate(field, data[field], data);
+      if (error != null) {
+        errors[field] = [error];
+      }
+    }
     return errors;
   }
 }

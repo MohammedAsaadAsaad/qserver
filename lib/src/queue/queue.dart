@@ -4,10 +4,11 @@ import 'job.dart';
 
 /// A global facade for dispatching background jobs
 class Queue {
+  static QueueDriver _driver() => QudsContainer.resolve<QueueDriver>();
+
   /// Pushes a job to the active queue driver for immediate execution
   static Future<void> push(Job job) async {
-    final driver = QudsContainer.resolve<QueueDriver>();
-    await driver.push(job);
+    await _driver().push(job);
   }
 
   /// Schedules [job] to run after [delay]
@@ -21,4 +22,10 @@ class Queue {
     job.availableAt = time;
     await push(job);
   }
+
+  /// Cancels a pending job by [id].
+  ///
+  /// Works with [MemoryQueueDriver] (by matching [Job.id]) and
+  /// [DatabaseQueueDriver]. Returns `false` if the job was not found.
+  static Future<bool> cancel(String id) => _driver().cancel(id);
 }

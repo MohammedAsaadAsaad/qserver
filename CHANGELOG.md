@@ -50,3 +50,26 @@
 - Expand validators: `IsInt`, `IsBool`, `IsUrl`, `IsConfirmed`, `InRule` (+ fluent helpers).
 - CLI: `make:middleware`, `make:provider`, `cache:clear` help text, and `executables.qserver`.
 - Add `QudsTestClient` / `QudsRouter.dispatchTest` for HTTP tests without binding a port.
+
+## 0.0.10
+
+### Phase A (additive; defaults unchanged)
+
+- Opt-in `SecurityHeadersMiddleware` and `RequestIdMiddleware` (not applied globally).
+- `Auth.issueTokens` for access/refresh token pairs.
+- Async `Unique` / `Exists` validation rules.
+- Opt-in Admin Insights routes behind `QUDS_INSIGHTS=true` and `QUDS_INSIGHTS_TOKEN` (Bearer), with replaceable `insightsAuthorizer` for future admin-role checks.
+
+### Phase B (opt-in drivers)
+
+- `RedisCacheDriver` + optional `CacheServiceProvider`; bind when `CACHE_DRIVER=redis`.
+- `DatabaseQueueDriver`, `SerializableJob`, `JobRegistry`, and `Queue.cancel` (memory returns false / removes by id).
+- Interval `Schedule.every` + export-only `ScheduleServiceProvider`.
+- Optional `RedisBroadcastBridge` when `BROADCAST_DRIVER=redis`.
+- Env auto-config in `registerProviders` / `serve` via `_configureDriversFromEnv` (no change unless env vars are set).
+
+### Phase C (storage + migrations)
+
+- Storage disks: `LocalStorageDisk` (default) and minimal S3-compatible `S3StorageDisk` (SigV4 PUT/HEAD/DELETE; `url()` from `S3_PUBLIC_URL`).
+- SQL file migrations: `FileMigrationRunner` (`database/migrations/<id>/up.sql`), CLI `make:migration` / `migrate` / `migrate:rollback`, optional `MIGRATE_ON_BOOT`.
+- Scaffold `.env` comments for optional drivers + `docker-compose.yml` (postgres + redis) on `qserver create`.

@@ -5,6 +5,7 @@ import '../http/quds_request.dart';
 
 /// A captured application exception, ready to review later.
 class QudsExceptionRecord {
+  final String id;
   final DateTime time;
   final String method;
   final String path;
@@ -14,6 +15,7 @@ class QudsExceptionRecord {
   final String stackTrace;
 
   QudsExceptionRecord({
+    required this.id,
     required this.time,
     required this.method,
     required this.path,
@@ -29,6 +31,7 @@ class QudsExceptionRecord {
     QudsRequest? request,
   ]) {
     return QudsExceptionRecord(
+      id: 'ex_${DateTime.now().microsecondsSinceEpoch}',
       time: DateTime.now(),
       method: request?.method.toUpperCase() ?? '-',
       path: request?.pathAndQuery ?? '-',
@@ -43,6 +46,19 @@ class QudsExceptionRecord {
   String get summary {
     final msg = message.replaceAll(RegExp(r'\s+'), ' ').trim();
     return '$errorType: $msg';
+  }
+
+  Map<String, dynamic> toJson({bool includeStack = true}) {
+    return {
+      'id': id,
+      'time': time.toUtc().toIso8601String(),
+      'method': method,
+      'path': path,
+      'ip': ip,
+      'errorType': errorType,
+      'message': message,
+      if (includeStack) 'stackTrace': stackTrace,
+    };
   }
 }
 

@@ -16,27 +16,44 @@ export 'src/http/middleware/cors_middleware.dart';
 export 'src/http/middleware/logger_middleware.dart';
 export 'src/http/middleware/exception_handler_middleware.dart';
 export 'src/http/middleware/rate_limit_middleware.dart';
+export 'src/http/middleware/security_headers_middleware.dart';
+export 'src/http/middleware/request_id_middleware.dart';
+export 'src/http/middleware/insights_auth_middleware.dart';
 export 'src/exceptions/exception_handler.dart';
 export 'src/exceptions/exception_log.dart';
 export 'src/storage/storage.dart';
+export 'src/storage/storage_disk.dart';
+export 'src/storage/local_storage_disk.dart';
+export 'src/storage/s3_storage_disk.dart';
 export 'src/http/uploaded_file.dart';
 export 'src/http/auth/auth.dart';
 export 'src/http/middleware/auth_middleware.dart';
 export 'src/queue/job.dart';
 export 'src/queue/queue.dart';
+export 'src/queue/queue_driver.dart';
 export 'src/queue/queue_provider.dart';
+export 'src/queue/serializable_job.dart';
+export 'src/queue/job_registry.dart';
+export 'src/queue/database_queue_driver.dart';
+export 'src/schedule/schedule.dart';
+export 'src/schedule/schedule_provider.dart';
 export 'src/broadcasting/broadcast.dart';
 export 'src/broadcasting/broadcast_provider.dart';
 export 'src/broadcasting/broadcast_manager.dart';
+export 'src/broadcasting/redis_broadcast_bridge.dart';
 export 'src/http/middleware/server_monitor.dart';
 export 'src/database/database_provider.dart';
+export 'src/database/migration_runner.dart';
 export 'src/http/dashboard.dart';
 export 'src/http/validator.dart';
 export 'src/cache/cache.dart';
 export 'src/cache/cache_driver.dart';
 export 'src/cache/memory_cache_driver.dart';
+export 'src/cache/redis_cache_driver.dart';
+export 'src/cache/cache_provider.dart';
 export 'src/logging/quds_log.dart';
 export 'src/testing/quds_test_client.dart';
+export 'src/insights/insights_routes.dart';
 export 'package:quds_db_interface/quds_db_interface.dart';
 export 'package:quds_db_postgres/quds_db_postgres.dart';
 export 'package:quds_db_mysql/quds_db_mysql.dart';
@@ -52,17 +69,82 @@ class QudsServerApp {
   String? welcomeSubheading;
   List<DashboardCard>? welcomeCards;
 
+  /// Optional Insights authorizer (JWT admin role, etc.). Used when Insights is on.
+  InsightsAuthorizer? insightsAuthorizer;
+
   QudsServerApp() {
     QudsContainer.singleton<QudsRouter>(router);
     if (!QudsContainer.isRegistered<CacheDriver>()) {
       QudsContainer.singleton<CacheDriver>(MemoryCacheDriver());
+    }
+    if (!QudsContainer.isRegistered<TokenStore>()) {
+      QudsContainer.singleton<TokenStore>(MemoryTokenStore());
+    }
+  }
+
+  /// Switches optional drivers from env after providers have registered/booted.
+  ///
+  /// Defaults remain memory cache, memory queue, and local storage unless the
+  /// corresponding env var is set.
+  Future<void> _configureDriversFromEnv() async {
+    final cacheDriver =
+        (env<String>('CACHE_DRIVER', 'memory') ?? 'memory').toLowerCase();
+    if (cacheDriver == 'redis') {
+      QudsContainer.singleton<CacheDriver>(RedisCacheDriver());
+      Log.info('CACHE_DRIVER=redis — RedisCacheDriver bound');
+    }
+
+    final queueDriver =
+        (env<String>('QUEUE_DRIVER', 'memory') ?? 'memory').toLowerCase();
+    if (queueDriver == 'database') {
+      if (QudsContainer.isRegistered<DatabaseConnection>()) {
+        QudsContainer.singleton<QueueDriver>(
+          DatabaseQueueDriver(QudsContainer.resolve<DatabaseConnection>()),
+        );
+        Log.info('QUEUE_DRIVER=database — DatabaseQueueDriver bound');
+      } else {
+        Log.warning(
+          'QUEUE_DRIVER=database but DatabaseConnection is not registered',
+        );
+      }
+    }
+
+    final filesystemDisk =
+        (env<String>('FILESYSTEM_DISK', 'local') ?? 'local').toLowerCase();
+    if (filesystemDisk != 'local') {
+      Storage.configureFromEnv(filesystemDisk);
+    }
+
+    final broadcastDriver =
+        (env<String>('BROADCAST_DRIVER', 'local') ?? 'local').toLowerCase();
+    if (broadcastDriver == 'redis') {
+      if (QudsContainer.isRegistered<BroadcastManager>()) {
+        await RedisBroadcastBridge.attach(
+          QudsContainer.resolve<BroadcastManager>(),
+        );
+      } else {
+        Log.warning(
+          'BROADCAST_DRIVER=redis requires BroadcastServiceProvider '
+          '(BroadcastManager not registered)',
+        );
+      }
+    }
+
+    final migrateOnBoot = env<bool>('MIGRATE_ON_BOOT', false) ?? false;
+    if (migrateOnBoot) {
+      if (QudsContainer.isRegistered<DatabaseConnection>()) {
+        await FileMigrationRunner.fromContainer().migrate();
+      } else {
+        Log.warning(
+          'MIGRATE_ON_BOOT=true but DatabaseConnection is not registered',
+        );
+      }
     }
   }
 
   void _registerWelcomeRoutes() {
     if (!router.hasRoute(HttpMethod.get, '/quds/stats')) {
       router.get('/quds/stats', (request) async {
-        // Never expose runtime internals outside local/dev.
         if (!isLocalEnvironment()) {
           return QudsResponse.error('Not found', status: 404);
         }
@@ -116,7 +198,6 @@ class QudsServerApp {
 
     if (!router.hasRoute(HttpMethod.get, '/quds/ready')) {
       router.get('/quds/ready', (request) async {
-        // Plan: not registered or unusable DB connection => 503.
         if (!QudsContainer.isRegistered<DatabaseConnection>()) {
           return QudsResponse.json({
             'status': 'not_ready',
@@ -150,13 +231,17 @@ class QudsServerApp {
     for (var provider in _providers) {
       await provider.boot();
     }
+    await _configureDriversFromEnv();
   }
 
   /// Starts the HTTP Server, pulling configs from the .env file automatically
   Future<void> serve({String? defaultHost, int? defaultPort}) async {
     await QudsEnv.load();
+    await _configureDriversFromEnv();
 
     _registerHealthRoutes();
+    InsightsRoutes.authorizer = insightsAuthorizer;
+    InsightsRoutes.register(router);
 
     if (showWelcomePage) {
       _registerWelcomeRoutes();
@@ -167,13 +252,12 @@ class QudsServerApp {
 
     final server = await HttpServer.bind(host, port);
 
-    // Catch CTRL+C to restore the terminal cursor before exiting
     ProcessSignal.sigint.watch().listen((ProcessSignal signal) {
       ServerMonitor.cleanup();
       exit(0);
     });
 
-    print('\x1B[2J\x1B[H'); // Clear screen
+    print('\x1B[2J\x1B[H');
     print('Starting Quds Server on http://$host:$port...');
 
     await for (HttpRequest request in server) {

@@ -93,6 +93,18 @@ class QudsRequest {
     return _headers['x-forwarded-for']?.split(',').first.trim() ?? _ip;
   }
 
+  /// Reads a request header (case-insensitive for live requests).
+  String? header(String name) {
+    if (_rawRequest != null) {
+      return _rawRequest!.headers.value(name);
+    }
+    final lower = name.toLowerCase();
+    for (final entry in _headers.entries) {
+      if (entry.key.toLowerCase() == lower) return entry.value;
+    }
+    return null;
+  }
+
   /// The parsed request body (e.g. JSON map, form fields, or raw data).
   Map<String, dynamic> get body => (_rawParsedBody is Map<String, dynamic>)
       ? (_rawParsedBody as Map<String, dynamic>)
@@ -137,6 +149,20 @@ class QudsRequest {
 
     final errors = ValidationEngine.validate(data, rules);
 
+    if (errors.isNotEmpty) {
+      throw QudsValidationException(errors);
+    }
+  }
+
+  /// Async validation path for DB-backed rules (Unique/Exists). Opt-in.
+  Future<void> validateAsync(
+    Map<String, QudsValidator> rules, {
+    Map<String, AsyncQudsValidator> asyncRules = const {},
+  }) async {
+    validate(rules);
+    final Map<String, dynamic> data =
+        _rawParsedBody is Map<String, dynamic> ? _rawParsedBody : {};
+    final errors = await ValidationEngine.validateAsync(data, asyncRules);
     if (errors.isNotEmpty) {
       throw QudsValidationException(errors);
     }

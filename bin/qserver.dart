@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:qserver/qserver.dart';
+
 void main(List<String> arguments) async {
   if (arguments.isEmpty) {
     _printHelp();
@@ -68,6 +70,20 @@ void main(List<String> arguments) async {
         'Call Cache.flush() from your app code, or restart the server.',
       );
       break;
+    case 'make:migration':
+      if (arguments.length < 2) {
+        print('Error: Please provide a migration name.');
+        print('Usage: qserver make:migration create_users_table');
+        return;
+      }
+      _makeMigration(arguments[1]);
+      break;
+    case 'migrate':
+      await _migrateCommand();
+      break;
+    case 'migrate:rollback':
+      await _migrateRollbackCommand();
+      break;
     default:
       print('Unknown command: $command');
       _printHelp();
@@ -85,6 +101,9 @@ void _printHelp() {
   print('  qserver make:job              Creates a new Background Job');
   print('  qserver make:middleware       Creates a new Middleware');
   print('  qserver make:provider         Creates a new Service Provider');
+  print('  qserver make:migration        Creates database/migrations/<id>/');
+  print('  qserver migrate               Applies pending SQL migrations');
+  print('  qserver migrate:rollback      Rolls back the last migration');
   print('  qserver cache:clear           Shows how to flush the cache');
 }
 
@@ -106,6 +125,7 @@ void _createProject(String projectName) {
   Directory('${root.path}/lib/models').createSync(recursive: true);
   Directory('${root.path}/lib/requests').createSync(recursive: true);
   Directory('${root.path}/lib/jobs').createSync(recursive: true);
+  Directory('${root.path}/database/migrations').createSync(recursive: true);
 
   // 1. pubspec.yaml
   File('${root.path}/pubspec.yaml').writeAsStringSync('''
@@ -134,6 +154,53 @@ DB_PORT=5432
 DB_DATABASE=${projectName}_db
 DB_USERNAME=postgres
 DB_PASSWORD=postgres
+
+# Optional drivers (defaults keep 0.0.9 behavior: memory / local)
+# CACHE_DRIVER=memory
+# CACHE_DRIVER=redis
+# QUEUE_DRIVER=memory
+# QUEUE_DRIVER=database
+# FILESYSTEM_DISK=local
+# FILESYSTEM_DISK=s3
+# BROADCAST_DRIVER=local
+# BROADCAST_DRIVER=redis
+# QUDS_INSIGHTS=false
+# MIGRATE_ON_BOOT=false
+
+# REDIS_HOST=127.0.0.1
+# REDIS_PORT=6379
+# REDIS_PASSWORD=
+# REDIS_PREFIX=quds:
+
+# S3_BUCKET=
+# S3_REGION=us-east-1
+# S3_ACCESS_KEY=
+# S3_SECRET_KEY=
+# S3_ENDPOINT=
+# S3_PUBLIC_URL=
+''');
+
+  // 2b. docker-compose (postgres + redis) for local development
+  File('${root.path}/docker-compose.yml').writeAsStringSync('''
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ${projectName}_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+volumes:
+  pgdata:
 ''');
 
   // 3. lib/main.dart
@@ -549,4 +616,65 @@ class $name extends ServiceProvider {
 
   file.writeAsStringSync(template);
   print('Provider [$name] created successfully at ${file.path}');
+}
+
+void _makeMigration(String name) {
+  final safe = name
+      .toLowerCase()
+      .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
+      .replaceAll(RegExp(r'^_|_$'), '');
+  final stamp = DateTime.now()
+      .toUtc()
+      .toIso8601String()
+      .replaceAll(RegExp(r'[:-]'), '')
+      .replaceAll('.', '')
+      .replaceAll('T', '')
+      .substring(0, 14);
+  final id = '${stamp}_$safe';
+  final dir = Directory('database/migrations/$id');
+  if (dir.existsSync()) {
+    print('Warning: Migration $id already exists.');
+    return;
+  }
+  dir.createSync(recursive: true);
+  File('${dir.path}/up.sql').writeAsStringSync(
+    '-- Migration: $id\n-- Write your UP SQL here.\n',
+  );
+  File('${dir.path}/down.sql').writeAsStringSync(
+    '-- Migration: $id\n-- Write your DOWN SQL here.\n',
+  );
+  print('Migration [$id] created at ${dir.path}');
+}
+
+Future<void> _migrateCommand() async {
+  await _withDatabaseConnection((connection) async {
+    final count = await FileMigrationRunner(connection).migrate();
+    print(count == 0 ? 'No pending migrations.' : 'Applied $count migration(s).');
+  });
+}
+
+Future<void> _migrateRollbackCommand() async {
+  await _withDatabaseConnection((connection) async {
+    final ok = await FileMigrationRunner(connection).rollback();
+    print(ok ? 'Rollback complete.' : 'Nothing to roll back.');
+  });
+}
+
+Future<void> _withDatabaseConnection(
+  Future<void> Function(DatabaseConnection connection) action,
+) async {
+  await QudsEnv.load();
+  QudsContainer.clear();
+  final provider = DatabaseServiceProvider();
+  provider.register();
+  await provider.boot();
+
+  if (!QudsContainer.isRegistered<DatabaseConnection>()) {
+    print('Error: Database connection failed. Check .env DB_* settings.');
+    exitCode = 1;
+    return;
+  }
+
+  final connection = QudsContainer.resolve<DatabaseConnection>();
+  await action(connection);
 }

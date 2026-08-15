@@ -200,21 +200,34 @@ class BroadcastManager {
     Log.debug('Client subscribed to [$channel]');
   }
 
+  /// Optional hook for Redis (or other) remote fan-out. Set by [RedisBroadcastBridge].
+  Future<void> Function(String channel, String event, Map<String, dynamic> data)?
+      remotePublish;
+
   /// Pushes an event payload to all clients connected to a specific channel
   void emit(String channel, String event, Map<String, dynamic> data) {
-    if (_channels.containsKey(channel)) {
-      final payload = qudsJsonEncode({
-        'channel': channel,
-        'event': event,
-        'data': data,
-      });
+    emitLocal(channel, event, data);
+    final publish = remotePublish;
+    if (publish != null) {
+      unawaited(publish(channel, event, data));
+    }
+  }
 
-      for (var socket in List<WebSocket>.from(_channels[channel]!)) {
-        try {
-          socket.add(payload);
-        } catch (_) {
-          _removeSocket(socket);
-        }
+  /// Delivers to local sockets only (used when receiving from Redis).
+  void emitLocal(String channel, String event, Map<String, dynamic> data) {
+    if (!_channels.containsKey(channel)) return;
+
+    final payload = qudsJsonEncode({
+      'channel': channel,
+      'event': event,
+      'data': data,
+    });
+
+    for (var socket in List<WebSocket>.from(_channels[channel]!)) {
+      try {
+        socket.add(payload);
+      } catch (_) {
+        _removeSocket(socket);
       }
     }
   }

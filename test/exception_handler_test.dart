@@ -89,6 +89,7 @@ void main() {
       for (var i = 0; i < 5; i++) {
         ExceptionLog.add(
           QudsExceptionRecord(
+            id: 'ex_$i',
             time: DateTime.now(),
             method: 'GET',
             path: '/n/$i',
@@ -121,6 +122,7 @@ void main() {
 
       ExceptionLog.add(
         QudsExceptionRecord(
+          id: 'ex_file',
           time: DateTime(2026, 8, 13, 16, 25, 3),
           method: 'POST',
           path: '/api/v1/tasks',

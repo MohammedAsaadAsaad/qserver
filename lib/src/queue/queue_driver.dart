@@ -8,6 +8,9 @@ abstract class QueueDriver {
 
   /// Retrieves the next ready job from the queue (FIFO among ready jobs)
   Future<Job?> pop();
+
+  /// Cancels a pending job by [id]. Returns `false` when unsupported or missing.
+  Future<bool> cancel(String id) async => false;
 }
 
 /// A lightweight, in-memory implementation for single-server setups
@@ -44,5 +47,12 @@ class MemoryQueueDriver implements QueueDriver {
       _jobs.addLast(d);
     }
     return null;
+  }
+
+  @override
+  Future<bool> cancel(String id) async {
+    final before = _jobs.length;
+    _jobs.removeWhere((j) => j.id == id);
+    return _jobs.length < before;
   }
 }

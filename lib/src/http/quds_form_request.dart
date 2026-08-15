@@ -15,6 +15,9 @@ abstract class QudsFormRequest {
   /// Get the validation rules that apply to the request.
   Map<String, QudsValidator> rules();
 
+  /// Optional async/DB-backed rules. Override to enable Unique/Exists checks.
+  Map<String, AsyncQudsValidator> asyncRules() => const {};
+
   /// Executes authorization and validation.
   /// Throws exceptions if either fails, halting controller execution instantly.
   Future<void> validate() async {
@@ -25,8 +28,13 @@ abstract class QudsFormRequest {
       );
     }
 
-    // 2. Run Validation Engine
-    request.validate(rules());
+    // 2. Run Validation Engine (sync + optional async)
+    final async = asyncRules();
+    if (async.isEmpty) {
+      request.validate(rules());
+    } else {
+      await request.validateAsync(rules(), asyncRules: async);
+    }
   }
 
   // ==========================================
