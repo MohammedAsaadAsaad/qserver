@@ -239,4 +239,15 @@ class BroadcastManager {
       sockets.remove(socket);
     });
   }
+
+  /// Closes every socket and stops the maintenance timer.
+  Future<void> close() async {
+    _maintenanceTimer?.cancel();
+    _maintenanceTimer = null;
+    for (final socket in List<WebSocket>.from(_socketState.keys)) {
+      _forceClose(socket);
+    }
+    _channels.clear();
+    _socketState.clear();
+  }
 }

@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:io';
 import '../exceptions/exception_handler.dart';
+import '../exceptions/http_exceptions.dart';
 import 'route.dart';
 import '../http/enums.dart';
 import '../http/quds_request.dart';
@@ -207,7 +209,11 @@ class QudsRouter {
     }
   }
 
-  Future<void> dispatch(HttpRequest rawRequest) async {
+  Future<void> dispatch(
+    HttpRequest rawRequest, {
+    int maxBodyBytes = 0,
+    Duration? timeout,
+  }) async {
     QudsRequest? qudsRequest;
     try {
       final methodStr = rawRequest.method.toUpperCase();
@@ -222,30 +228,49 @@ class QudsRouter {
 
       final routeParams =
           route != null ? route.extractParams(path) : <String, String>{};
-      qudsRequest = await QudsRequest.from(
+      final parsed = await QudsRequest.from(
         rawRequest,
         routeParams: routeParams,
+        maxBodyBytes: maxBodyBytes,
       );
+      qudsRequest = parsed;
+
+      final pipeline = route != null
+          ? _executePipeline(parsed, route)
+          : _executePipeline(
+              parsed,
+              Route(
+                requestMethod,
+                path,
+                (req) async =>
+                    QudsResponse.error("Route Not Found", status: 404),
+              ),
+            );
 
       QudsResponse response;
-      if (route != null) {
-        response = await _executePipeline(qudsRequest, route);
+      if (timeout != null) {
+        try {
+          response = await pipeline.timeout(timeout);
+        } on TimeoutException {
+          pipeline.ignore();
+          throw QudsRequestTimeoutException(timeout);
+        }
       } else {
-        final dummy404Route = Route(
-          requestMethod,
-          path,
-          (req) async => QudsResponse.error("Route Not Found", status: 404),
-        );
-        response = await _executePipeline(qudsRequest, dummy404Route);
+        response = await pipeline;
       }
       await response.send(rawRequest.response);
     } catch (e, stack) {
+      try {
+        await rawRequest.drain<void>();
+      } catch (_) {}
       final res = GlobalExceptionHandler.handle(
         e,
         stackTrace: stack,
         request: qudsRequest,
       );
-      await res.send(rawRequest.response);
+      try {
+        await res.send(rawRequest.response);
+      } catch (_) {}
     }
   }
 }

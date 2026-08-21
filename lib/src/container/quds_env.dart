@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import '../logging/quds_log.dart';
+
 class QudsEnv {
   static final Map<String, String> _vars = {};
   static bool _loaded = false;
@@ -11,11 +13,12 @@ class QudsEnv {
   /// 2. `.env` when present (or [path])
   /// 3. `.env.$APP_ENV` when present (`APP_ENV` defaults to `local`)
   static Future<void> load({String path = '.env'}) async {
+    final firstLoad = !_loaded;
     _vars
       ..clear()
       ..addAll(Platform.environment);
 
-    final baseLoaded = await _loadFile(path);
+    final baseLoaded = await _loadFile(path, announce: firstLoad);
 
     final appEnv = (_vars['APP_ENV'] ?? 'local').trim();
     final parent = File(path).parent.path;
@@ -24,23 +27,29 @@ class QudsEnv {
 
     var layeredLoaded = false;
     if (layeredPath != path) {
-      layeredLoaded = await _loadFile(layeredPath);
+      layeredLoaded = await _loadFile(layeredPath, announce: firstLoad);
     }
 
-    if (!baseLoaded && !layeredLoaded) {
-      print(
-        'ℹ️  No .env file found. Relying on system environment variables.',
-      );
+    if (firstLoad) {
+      if (!baseLoaded && !layeredLoaded) {
+        Log.boot('No .env file — using process environment');
+      } else {
+        Log.boot('Environment ready  env=$appEnv');
+      }
+    } else {
+      Log.debug('Environment reloaded  env=$appEnv', component: 'boot');
     }
 
     _loaded = true;
   }
 
-  static Future<bool> _loadFile(String path) async {
+  static Future<bool> _loadFile(String path, {bool announce = true}) async {
     final file = File(path);
     if (!await file.exists()) return false;
 
-    print('📂 Loading env file from: ${file.absolute.path}');
+    if (announce) {
+      Log.boot('Loading ${file.path}');
+    }
     final lines = await file.readAsLines();
     for (var line in lines) {
       line = line.trim();
@@ -79,6 +88,15 @@ class QudsEnv {
 
   /// Whether [load] has been called at least once in this process.
   static bool get isLoaded => _loaded;
+
+  /// Sets or clears a variable without loading files (tests / runtime overrides).
+  static void set(String key, String? value) {
+    if (value == null) {
+      _vars.remove(key);
+    } else {
+      _vars[key] = value;
+    }
+  }
 }
 
 /// Global helper mirroring Laravel's env() function

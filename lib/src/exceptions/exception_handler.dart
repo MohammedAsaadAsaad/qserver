@@ -4,18 +4,25 @@ import '../http/quds_response.dart';
 import '../routing/router.dart';
 import '../container/quds_env.dart';
 import 'exception_log.dart';
+import 'http_exceptions.dart';
 
 /// A centralized hub for formatting and returning application errors.
 class GlobalExceptionHandler {
-  /// True for validation / authorization failures that are part of normal flow.
+  /// True for validation / authorization / operational HTTP failures.
   static bool isExpected(Object error) {
     return error is QudsValidationException ||
-        error is QudsAuthorizationException;
+        error is QudsAuthorizationException ||
+        error is QudsPayloadTooLargeException ||
+        error is QudsRequestTimeoutException ||
+        error is QudsServiceUnavailableException;
   }
 
   static int statusOf(Object error) {
     if (error is QudsValidationException) return 422;
     if (error is QudsAuthorizationException) return 403;
+    if (error is QudsPayloadTooLargeException) return 413;
+    if (error is QudsRequestTimeoutException) return 504;
+    if (error is QudsServiceUnavailableException) return 503;
     return 500;
   }
 
@@ -60,6 +67,18 @@ class GlobalExceptionHandler {
 
     if (error is QudsAuthorizationException) {
       return QudsResponse.error(error.message, status: 403);
+    }
+
+    if (error is QudsPayloadTooLargeException) {
+      return QudsResponse.error(error.message, status: 413);
+    }
+
+    if (error is QudsRequestTimeoutException) {
+      return QudsResponse.error(error.message, status: 504);
+    }
+
+    if (error is QudsServiceUnavailableException) {
+      return QudsResponse.error(error.message, status: 503);
     }
 
     final debug = isLocalEnvironment();

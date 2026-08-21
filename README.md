@@ -12,8 +12,13 @@ qserver provides a complete ecosystem for building server-side applications, fea
 - **Asynchronous Queue Worker**: Offload heavy or slow workloads into background jobs using an asynchronous worker queue.
 - **WebSocket Event Broadcasting**: Broadcast events on private or public channels to real-time clients instantly.
 - **Database Table Providers**: Streamlined database integration using models and table providers powered by PostgreSQL, MySQL, and other DB interfaces.
-- **Developer Command Console**: An interactive terminal dashboard displaying live traffic logs (time, status, path, duration, client IP), throughput statistics, latency trends, and recent exceptions.
+- **Structured logging**: Color-coded, component-scoped boot and runtime logs. The live terminal monitor updates in place (no flicker) on a TTY, with a duration column and LOAD / LAT / ERR / MEM / Q / WS pressure bars; piped/CI output stays append-only.
 - **CLI Utility Tool**: Instantly scaffold new projects, make controllers, database models, requests, and background jobs.
+- **Identity**: Email/password plus Google, Apple, and Firebase sign-in, all issuing the same JWT access/refresh pair. Optional `Mailer.send` and `DatabaseUserStore`.
+- **Object storage**: Local disk, S3-compatible, or Google Cloud Storage.
+- **Health checks**: Liveness, readiness (database / Redis / custom probes), and optional webhook alerts.
+- **Admin Insights**: Opt-in JSON APIs and an HTML dashboard for recent exceptions and failed jobs.
+- **Production ops**: Graceful shutdown, opt-in request limits, `QUEUE_CONCURRENCY`, and Prometheus text at `GET /quds/metrics`.
 
 ---
 
@@ -23,7 +28,7 @@ Add `qserver` to your `pubspec.yaml` dependencies:
 
 ```yaml
 dependencies:
-  qserver: any
+  qserver: ^0.0.14
 ```
 
 ---
@@ -97,6 +102,21 @@ void main() async {
   await app.serve();
 }
 ```
+
+Boot and runtime logs look like this (no screen wipe):
+
+```text
+12:03:12.100  INFO   boot      Starting application boot
+12:03:12.110  INFO   boot      Loading .env
+12:03:12.112  INFO   boot      Environment ready  env=local
+12:03:12.180  INFO   db        Connecting postgres 127.0.0.1:5432/app_db
+12:03:12.310  INFO   db        Connected postgres · 130ms
+12:03:12.320  INFO   queue     Worker listening
+12:03:12.330  INFO   ws        WebSocket endpoint ready at /ws
+12:03:12.340  INFO   http      Listening on http://0.0.0.0:8000  env=local  pid=1842
+```
+
+On an interactive TTY the live monitor then updates in place. Set `QUDS_MONITOR=false` to keep append-only logs, or `LOG_LEVEL=debug` for more detail.
 
 ### Routing and Middleware
 
@@ -232,6 +252,15 @@ Push the job onto the worker queue:
 Queue.push(SendEmailJob(email: 'user@example.com', content: 'Welcome to our platform!'));
 ```
 
+While a job runs, the worker shows a preloader (`⠋ SendEmailJob`) and then a single result line:
+
+```text
+12:03:16.200  INFO   queue     ✓ SendEmailJob · 1.2s
+12:03:18.010  ERROR  queue     ✗ SendEmailJob · 12ms — retry in 1s (1/3): SMTP timeout
+```
+
+Override `Job.label` if you want a friendlier name. Use `Log.spinner('Export')` / `Log.withSpinner(...)` for your own long work.
+
 ### WebSockets and Event Broadcasting
 
 Declare event channels and broadcast payloads to clients listening in real-time:
@@ -250,6 +279,60 @@ Broadcast.emit('public.updates', 'StatusChanged', {
 ```
 
 Clients can connect to `ws://localhost:8000/ws` and subscribe to these channels.
+
+### Identity (email and social)
+
+`EmailAuth` and `SocialAuth` sit on top of the existing JWT `Auth` facade. Bind a `UserStore` (defaults to in-memory) if you want to persist users yourself.
+
+```dart
+final session = await EmailAuth.register(
+  email: 'user@example.com',
+  password: 'secret123',
+);
+// session['accessToken'], session['refreshToken']
+
+EmailAuth.onVerificationToken = (user, token) {
+  // send email
+};
+
+AuthRoutes.register(app.router); // POST /auth/register, /login, /google, ...
+```
+
+Social login verifies a provider token, then issues the same JWT pair:
+
+```dart
+final session = await SocialAuth.loginWithGoogle(idToken);
+// Also: loginWithApple, loginWithFirebase
+```
+
+Set `GOOGLE_CLIENT_ID`, `APPLE_CLIENT_ID`, and `FIREBASE_API_KEY` when using the default verifiers. Replace `SocialAuth.verifiers['google']` in tests.
+
+### File storage
+
+```dart
+Storage.configureFromEnv(); // FILESYSTEM_DISK=local|s3|gcs
+await Storage.put('avatars/me.png', bytes);
+```
+
+GCS uses `GCS_BUCKET` plus `GCS_ACCESS_TOKEN`, or a service account (`GCS_CLIENT_EMAIL` + `GCS_PRIVATE_KEY`).
+
+### Health checks and Insights
+
+```dart
+ReadinessChecker.add(() async => HealthCheckResult.ok('payments'));
+HealthNotifier.onChange = (report) async {
+  // Slack / email — also set HEALTH_WEBHOOK_URL
+};
+
+// QUDS_INSIGHTS=true and QUDS_INSIGHTS_TOKEN=...
+// GET /quds/insights  (HTML)   GET /quds/insights/exceptions
+// GET /quds/insights/failed-jobs
+
+// QUDS_METRICS=true
+// GET /quds/metrics   (Prometheus)
+```
+
+Set `Mailer.send` to deliver verification and reset tokens (or keep using `EmailAuth.onVerificationToken`). Persist users with `AUTH_USER_STORE=database` when a `DatabaseConnection` is registered.
 
 ---
 

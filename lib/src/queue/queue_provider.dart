@@ -6,6 +6,8 @@ import 'queue_driver.dart';
 import 'queue_worker.dart';
 
 class QueueServiceProvider extends ServiceProvider {
+  QueueWorker? _worker;
+
   @override
   void register() {
     // Default memory driver. `QUEUE_DRIVER=database` is applied after boot
@@ -16,7 +18,7 @@ class QueueServiceProvider extends ServiceProvider {
     final driver = (env<String>('QUEUE_DRIVER', 'memory') ?? 'memory')
         .toLowerCase();
     if (driver == 'memory') {
-      Log.debug('Queue driver: memory (default)');
+      Log.debug('Driver memory', component: 'queue');
     }
   }
 
@@ -24,9 +26,16 @@ class QueueServiceProvider extends ServiceProvider {
   void boot() {
     // Resolve dynamically so env-based driver swaps after boot are picked up.
     final worker = QueueWorker();
+    _worker = worker;
+    QudsContainer.singleton<QueueWorker>(worker);
 
     // We do NOT 'await' this. It must run asynchronously in the background
     // alongside the HTTP server.
     worker.start();
+  }
+
+  @override
+  Future<void> shutdown() async {
+    await _worker?.stop();
   }
 }

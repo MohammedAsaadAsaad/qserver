@@ -36,9 +36,13 @@ class LoggerMiddleware extends Middleware {
     if (_skipPaths.contains(request.path)) return;
 
     ServerMonitor.log(request, response, stopwatch.elapsedMilliseconds);
-    Log.info(
-      '${request.method} ${request.pathAndQuery} → '
-      '${response.statusCode} (${stopwatch.elapsedMilliseconds}ms) ip=${request.ip}',
-    );
+    if (!ServerMonitor.isDrawing) {
+      Log.info(
+        '${request.method} ${request.pathAndQuery} → '
+        '${response.statusCode} ip=${request.ip}',
+        component: 'http',
+        elapsed: stopwatch.elapsed,
+      );
+    }
   }
 }

@@ -19,14 +19,24 @@ class CacheServiceProvider extends ServiceProvider {
     switch (driver) {
       case 'redis':
         QudsContainer.singleton<CacheDriver>(RedisCacheDriver());
-        Log.info('Cache driver: redis');
+        Log.info('Driver redis', component: 'cache');
         break;
       default:
         QudsContainer.singleton<CacheDriver>(MemoryCacheDriver());
-        Log.info('Cache driver: memory');
+        Log.info('Driver memory', component: 'cache');
     }
   }
 
   @override
   Future<void> boot() async {}
+
+  @override
+  Future<void> shutdown() async {
+    if (QudsContainer.isRegistered<CacheDriver>()) {
+      final driver = QudsContainer.resolve<CacheDriver>();
+      if (driver is RedisCacheDriver) {
+        await driver.close();
+      }
+    }
+  }
 }

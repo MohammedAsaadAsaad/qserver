@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:quds_db_interface/quds_db_interface.dart';
 
 import '../container/quds_container.dart';
+import '../container/quds_env.dart';
 import '../logging/quds_log.dart';
 
 /// Applies SQL files from `database/migrations/<id>/up.sql`.
@@ -12,6 +13,7 @@ import '../logging/quds_log.dart';
 class FileMigrationRunner {
   final DatabaseConnection connection;
   final String migrationsPath;
+  final String _lockOwner = 'qserver-$pid';
 
   FileMigrationRunner(
     this.connection, {
@@ -59,7 +61,9 @@ CREATE TABLE IF NOT EXISTS quds_migrations (
       dir.path.split(Platform.pathSeparator).last;
 
   /// Applies all pending `up.sql` files in order.
-  Future<int> migrate() async {
+  Future<int> migrate() => _withLock(_migrateUnlocked);
+
+  Future<int> _migrateUnlocked() async {
     await _ensureTable();
     final applied = (await _appliedIds()).toSet();
     var count = 0;
@@ -91,7 +95,9 @@ CREATE TABLE IF NOT EXISTS quds_migrations (
   }
 
   /// Rolls back the last applied migration using `down.sql` when present.
-  Future<bool> rollback() async {
+  Future<bool> rollback() => _withLock(_rollbackUnlocked);
+
+  Future<bool> _rollbackUnlocked() async {
     await _ensureTable();
     final applied = await _appliedIds();
     if (applied.isEmpty) {
@@ -116,6 +122,82 @@ CREATE TABLE IF NOT EXISTS quds_migrations (
     );
     Log.info('Rolled back: $id');
     return true;
+  }
+
+  Future<T> _withLock<T>(Future<T> Function() action) async {
+    final acquired = await _acquireLock();
+    if (!acquired) {
+      throw StateError(
+        'Could not acquire migration lock. Another process may be migrating.',
+      );
+    }
+    try {
+      return await action();
+    } finally {
+      await _releaseLock();
+    }
+  }
+
+  Future<void> _ensureLockTable() async {
+    await connection.execute('''
+CREATE TABLE IF NOT EXISTS quds_migration_lock (
+  lock_id TEXT PRIMARY KEY,
+  owner TEXT NOT NULL,
+  locked_at TEXT NOT NULL
+)
+''');
+  }
+
+  Duration get _lockWait => Duration(
+        seconds: env<int>('MIGRATE_LOCK_SECONDS', 30) ?? 30,
+      );
+
+  Duration get _lockTtl => const Duration(minutes: 10);
+
+  Future<bool> _acquireLock() async {
+    await _ensureLockTable();
+    final deadline = DateTime.now().add(_lockWait);
+
+    while (true) {
+      await _deleteStaleLocks();
+      try {
+        await connection.execute(
+          '''
+INSERT INTO quds_migration_lock (lock_id, owner, locked_at)
+VALUES (?, ?, ?)
+''',
+          [
+            'default',
+            _lockOwner,
+            DateTime.now().toUtc().toIso8601String(),
+          ],
+        );
+        return true;
+      } catch (_) {
+        if (DateTime.now().isAfter(deadline)) return false;
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+      }
+    }
+  }
+
+  Future<void> _deleteStaleLocks() async {
+    final cutoff =
+        DateTime.now().toUtc().subtract(_lockTtl).toIso8601String();
+    await connection.execute(
+      'DELETE FROM quds_migration_lock WHERE locked_at < ?',
+      [cutoff],
+    );
+  }
+
+  Future<void> _releaseLock() async {
+    try {
+      await connection.execute(
+        'DELETE FROM quds_migration_lock WHERE lock_id = ? AND owner = ?',
+        ['default', _lockOwner],
+      );
+    } catch (e) {
+      Log.debug('Migration lock release: $e');
+    }
   }
 
   Future<void> _runStatements(String sql) async {

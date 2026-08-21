@@ -1,6 +1,7 @@
 import '../container/service_provider.dart';
 import '../container/quds_container.dart';
 import '../container/quds_env.dart';
+import '../logging/quds_log.dart';
 
 import 'package:quds_db_postgres/quds_db_postgres.dart';
 import 'package:quds_db_mysql/quds_db_mysql.dart';
@@ -14,9 +15,21 @@ class DatabaseServiceProvider extends ServiceProvider {
   @override
   Future<void> boot() async {
     final connectionType = env<String>('DB_CONNECTION', 'postgres')!;
+    final host = env<String>('DB_HOST', '127.0.0.1')!;
+    final port = env<int>(
+      'DB_PORT',
+      connectionType == 'mysql' ? 3306 : 5432,
+    )!;
+    final database = env<String>('DB_DATABASE', 'quds_db')!;
+
+    Log.info(
+      'Connecting $connectionType $host:$port/$database',
+      component: 'db',
+    );
 
     DatabaseAdapter adapter;
     DatabaseConnection connection;
+    final sw = Stopwatch()..start();
 
     try {
       switch (connectionType) {
@@ -24,9 +37,9 @@ class DatabaseServiceProvider extends ServiceProvider {
           adapter = PostgresDatabaseAdapter();
           await adapter.initialize(
             PostgresDatabaseSettings(
-              dbName: env<String>('DB_DATABASE', 'quds_db')!,
-              host: env<String>('DB_HOST', '127.0.0.1')!,
-              port: env<int>('DB_PORT', 5432)!,
+              dbName: database,
+              host: host,
+              port: port,
               userName: env<String>('DB_USERNAME', 'root')!,
               password: env<String>('DB_PASSWORD', '')!,
               version: 1,
@@ -40,9 +53,9 @@ class DatabaseServiceProvider extends ServiceProvider {
           adapter = MysqlDatabaseAdapter();
           await adapter.initialize(
             MysqlDatabaseSettings(
-              dbName: env<String>('DB_DATABASE', 'quds_db')!,
-              host: env<String>('DB_HOST', '127.0.0.1')!,
-              port: env<int>('DB_PORT', 3306)!,
+              dbName: database,
+              host: host,
+              port: port,
               userName: env<String>('DB_USERNAME', 'root')!,
               password: env<String>('DB_PASSWORD', '')!,
               version: 1,
@@ -63,9 +76,27 @@ class DatabaseServiceProvider extends ServiceProvider {
       QudsContainer.singleton<DatabaseAdapter>(adapter);
       QudsContainer.singleton<DatabaseConnection>(connection);
 
-      print('📦 Connected to $connectionType database via Quds DB ecosystem.');
+      Log.info(
+        'Connected $connectionType · ${sw.elapsedMilliseconds}ms',
+        component: 'db',
+      );
     } catch (e) {
-      print('\x1B[31m❌ Database connection failed. Error: $e\x1B[0m');
+      Log.error(
+        'Connection failed · ${sw.elapsedMilliseconds}ms: $e',
+        component: 'db',
+      );
+    }
+  }
+
+  @override
+  Future<void> shutdown() async {
+    if (QudsContainer.isRegistered<DatabaseAdapter>()) {
+      try {
+        await QudsContainer.resolve<DatabaseAdapter>().close();
+        Log.info('Connection closed', component: 'db');
+      } catch (e) {
+        Log.debug('Database adapter close: $e', component: 'db');
+      }
     }
   }
 }

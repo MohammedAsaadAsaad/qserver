@@ -12,6 +12,6 @@ class ScheduleServiceProvider extends ServiceProvider {
 
   @override
   Future<void> boot() async {
-    Log.info('Schedule service ready (interval jobs via Queue)');
+    Log.info('Interval jobs via Queue', component: 'schedule');
   }
 }

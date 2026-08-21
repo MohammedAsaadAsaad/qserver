@@ -129,8 +129,12 @@ class QudsRequest {
   static Future<QudsRequest> from(
     HttpRequest request, {
     Map<String, String> routeParams = const {},
+    int maxBodyBytes = 0,
   }) async {
-    final parsedBody = await RequestParser.parseBody(request);
+    final parsedBody = await RequestParser.parseBody(
+      request,
+      maxBytes: maxBodyBytes,
+    );
     return QudsRequest._(
       request,
       parsedBody,

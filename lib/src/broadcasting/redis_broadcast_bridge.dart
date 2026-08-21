@@ -15,6 +15,7 @@ class RedisBroadcastBridge {
   static const String channelName = 'quds:broadcast';
 
   static BroadcastManager? _manager;
+  static RedisConnection? _pubConn;
   static Command? _pubCommand;
   static bool _listening = false;
   static bool _attached = false;
@@ -33,6 +34,7 @@ class RedisBroadcastBridge {
 
     try {
       final pubConn = RedisConnection();
+      _pubConn = pubConn;
       _pubCommand = await pubConn.connect(host, port);
       if (password != null && password.isNotEmpty) {
         await _pubCommand!.send_object(['AUTH', password]);
@@ -40,7 +42,7 @@ class RedisBroadcastBridge {
 
       manager.remotePublish = _publish;
       _attached = true;
-      Log.info('Redis broadcast bridge attached ($host:$port)');
+      Log.info('Redis bridge attached $host:$port', component: 'ws');
 
       // Subscribe on a separate connection (Redis pub/sub requirement).
       unawaited(_listen(host, port, password));
@@ -48,6 +50,7 @@ class RedisBroadcastBridge {
       Log.warning(
         'Redis broadcast requires BROADCAST_DRIVER=redis and a reachable Redis. '
         'Attach failed: $e',
+        component: 'ws',
       );
     }
   }
@@ -113,11 +116,30 @@ class RedisBroadcastBridge {
     }
   }
 
+  /// Closes the publisher connection. Subscriber sockets drop with the process.
+  static Future<void> detach() async {
+    _attached = false;
+    _listening = false;
+    _manager?.remotePublish = null;
+    _manager = null;
+    _pubCommand = null;
+    final conn = _pubConn;
+    _pubConn = null;
+    if (conn != null) {
+      try {
+        await conn.close();
+      } catch (e) {
+        Log.debug('Redis broadcast detach: $e');
+      }
+    }
+  }
+
   /// Test helper.
   static void reset() {
     _attached = false;
     _listening = false;
     _manager = null;
     _pubCommand = null;
+    _pubConn = null;
   }
 }

@@ -1,56 +1,67 @@
 import 'package:qserver/qserver.dart';
+import '../jobs/process_task_job.dart';
 import '../models/task.dart';
 import '../requests/create_task_request.dart';
-import '../jobs/process_task_job.dart';
 
+/// Tasks persist in Postgres when the database booted; otherwise in memory.
 class TaskController {
-  late final TaskProvider provider;
+  TaskProvider? _provider;
+  final List<Map<String, dynamic>> _memory = [];
+  int _nextId = 1;
 
-  TaskController() {
-    // Dynamically grab the active connection from the IoC Container
-    final connection =
-        QudsContainer.resolve<DatabaseConnection>()
-            as PostgresDatabaseConnection;
-    provider = TaskProvider(connection);
+  bool get _hasDb => QudsContainer.isRegistered<DatabaseConnection>();
+
+  TaskProvider get _db {
+    return _provider ??= TaskProvider(
+      QudsContainer.resolve<DatabaseConnection>() as PostgresDatabaseConnection,
+    );
   }
 
-  /// Fetches all tasks from the database
   Future<QudsResponse> index(QudsRequest request) async {
-    await provider.initialize(); // Ensures table exists
-
-    final tasks = await provider.select();
-
-    // Convert the StandardDbModels into JSON maps
-    final taskData = tasks.map((t) => t.toMap()).toList();
+    if (_hasDb) {
+      await _db.initialize();
+      final tasks = await _db.select();
+      return QudsResponse.json({
+        'message': 'Tasks retrieved successfully',
+        'storage': 'postgres',
+        'data': tasks.map((t) => t.toMap()).toList(),
+      });
+    }
 
     return QudsResponse.json({
       'message': 'Tasks retrieved successfully',
-      'data': taskData,
+      'storage': 'memory',
+      'data': _memory,
     });
   }
 
-  /// Validates, saves, broadcasts, and queues a new task
   Future<QudsResponse> store(QudsRequest request) async {
     final form = CreateTaskRequest(request);
     await form.validate();
 
-    await provider.initialize();
+    late final Map<String, dynamic> payload;
+    if (_hasDb) {
+      await _db.initialize();
+      final task = Task()..fromMap(request.body);
+      await _db.insertEntry(task);
+      payload = task.toMap();
+    } else {
+      payload = {
+        'id': _nextId++,
+        'title': request.input<String>('title'),
+        'description': request.input<String>('description'),
+        'status': 'pending',
+      };
+      _memory.add(payload);
+    }
 
-    // 1. Create and populate the Model
-    final task = Task()..fromMap(request.body);
-
-    // 2. Save using the Quds DB Provider
-    await provider.insertEntry(task);
-
-    final responsePayload = task.toMap();
-
-    // 3. Queue and Broadcast
-    Queue.push(ProcessTaskJob(responsePayload));
-    Broadcast.emit('public.tasks', 'TaskCreated', responsePayload);
+    await Queue.push(ProcessTaskJob(payload));
+    Broadcast.emit('public.tasks', 'TaskCreated', payload);
 
     return QudsResponse.json({
-      'message': 'Task created successfully!',
-      'data': responsePayload,
+      'message': 'Task created — processing in the background',
+      'storage': _hasDb ? 'postgres' : 'memory',
+      'data': payload,
     }, status: 201);
   }
 }

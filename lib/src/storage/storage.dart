@@ -1,5 +1,6 @@
 import '../container/quds_env.dart';
 import '../logging/quds_log.dart';
+import 'gcs_storage_disk.dart';
 import 'local_storage_disk.dart';
 import 's3_storage_disk.dart';
 import 'storage_disk.dart';
@@ -37,14 +38,18 @@ class Storage {
     switch (name) {
       case 's3':
         _disk = S3StorageDisk();
-        Log.info('Storage disk: s3');
+        Log.info('Disk s3', component: 'storage');
+        break;
+      case 'gcs':
+        _disk = GcsStorageDisk();
+        Log.info('Disk gcs', component: 'storage');
         break;
       default:
         final currentRoot = _disk is LocalStorageDisk
             ? (_disk as LocalStorageDisk).rootPath
             : 'storage/app/public';
         _disk = LocalStorageDisk(rootPath: currentRoot);
-        Log.debug('Storage disk: local');
+        Log.debug('Disk local', component: 'storage');
     }
   }
 

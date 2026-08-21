@@ -15,6 +15,7 @@ class RedisCacheDriver implements CacheDriver {
   final String? password;
   final String keyPrefix;
 
+  RedisConnection? _connection;
   Command? _command;
   Future<Command>? _connecting;
 
@@ -37,6 +38,7 @@ class RedisCacheDriver implements CacheDriver {
 
     _connecting = () async {
       final conn = RedisConnection();
+      _connection = conn;
       final command = await conn.connect(host, port);
       final pass = password;
       if (pass != null && pass.isNotEmpty) {
@@ -112,5 +114,28 @@ class RedisCacheDriver implements CacheDriver {
         await cmd.send_object(['DEL', ...keys]);
       }
     } while (cursor != '0');
+  }
+
+  /// `PING` — used by readiness when this driver is bound.
+  Future<void> ping() async {
+    final cmd = await _cmd();
+    final reply = await cmd.send_object(['PING']);
+    if (reply.toString().toUpperCase() != 'PONG') {
+      throw StateError('Redis PING returned $reply');
+    }
+  }
+
+  Future<void> close() async {
+    _command = null;
+    _connecting = null;
+    final conn = _connection;
+    _connection = null;
+    if (conn != null) {
+      try {
+        await conn.close();
+      } catch (e) {
+        Log.debug('Redis cache close: $e');
+      }
+    }
   }
 }

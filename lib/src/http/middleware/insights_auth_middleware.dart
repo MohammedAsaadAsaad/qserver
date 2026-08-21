@@ -35,6 +35,16 @@ class InsightsAuthMiddleware extends Middleware {
       provided = header.substring(7).trim();
     }
     provided ??= request.attributes['insightsToken'] as String?;
+    provided ??= request.query('token');
     return provided != null && provided == expected;
+  }
+
+  /// Shared gate used by JSON routes and the HTML dashboard.
+  static Future<bool> isAuthorized(
+    QudsRequest request, {
+    InsightsAuthorizer? authorizer,
+  }) async {
+    if (authorizer != null) return authorizer(request);
+    return _defaultTokenGate(request);
   }
 }

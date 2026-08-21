@@ -1,6 +1,7 @@
 import '../container/service_provider.dart';
 import '../container/quds_container.dart';
 import '../http/quds_response.dart';
+import '../logging/quds_log.dart';
 import '../routing/router.dart';
 import 'broadcast_manager.dart';
 
@@ -24,6 +25,13 @@ class BroadcastServiceProvider extends ServiceProvider {
       return QudsResponse.upgraded();
     });
 
-    print('📻 WebSocket Broadcasting Engine initialized at /ws');
+    Log.info('WebSocket endpoint ready at /ws', component: 'ws');
+  }
+
+  @override
+  Future<void> shutdown() async {
+    if (QudsContainer.isRegistered<BroadcastManager>()) {
+      await QudsContainer.resolve<BroadcastManager>().close();
+    }
   }
 }

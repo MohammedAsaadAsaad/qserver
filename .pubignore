@@ -5,3 +5,8 @@ example_messaging/
 # Never ship compiled executables or stray build artifacts.
 *.exe
 *.exe.old
+
+# Local runtime output
+storage/
+**/storage/logs/
+

@@ -162,10 +162,25 @@ DB_PASSWORD=postgres
 # QUEUE_DRIVER=database
 # FILESYSTEM_DISK=local
 # FILESYSTEM_DISK=s3
+# FILESYSTEM_DISK=gcs
 # BROADCAST_DRIVER=local
 # BROADCAST_DRIVER=redis
+# QUDS_MONITOR=
 # QUDS_INSIGHTS=false
+# QUDS_INSIGHTS_TOKEN=
+# HEALTH_WEBHOOK_URL=
 # MIGRATE_ON_BOOT=false
+# GOOGLE_CLIENT_ID=
+# APPLE_CLIENT_ID=
+# FIREBASE_API_KEY=
+
+# Optional production limits (0 = unlimited / disabled — same as previous versions)
+# MAX_CONCURRENT_REQUESTS=0
+# REQUEST_TIMEOUT_SECONDS=0
+# MAX_BODY_BYTES=0
+# SHUTDOWN_TIMEOUT_SECONDS=15
+# QUEUE_RESERVE_TIMEOUT_SECONDS=900
+# MIGRATE_LOCK_SECONDS=30
 
 # REDIS_HOST=127.0.0.1
 # REDIS_PORT=6379
@@ -178,6 +193,12 @@ DB_PASSWORD=postgres
 # S3_SECRET_KEY=
 # S3_ENDPOINT=
 # S3_PUBLIC_URL=
+
+# GCS_BUCKET=
+# GCS_PUBLIC_URL=
+# GCS_ACCESS_TOKEN=
+# GCS_CLIENT_EMAIL=
+# GCS_PRIVATE_KEY=
 ''');
 
   // 2b. docker-compose (postgres + redis) for local development
@@ -306,10 +327,11 @@ class ProcessTaskJob extends Job {
   ProcessTaskJob(this.taskData);
 
   @override
+  String get label => 'ProcessTask \${taskData['title'] ?? ''}';
+
+  @override
   Future<void> handle() async {
-    print('Background Worker: Processing task: \${taskData['title']}...');
     await Future.delayed(const Duration(seconds: 2));
-    print('Background Worker: Task complete: \${taskData['title']}.');
   }
 }
 ''');
@@ -550,8 +572,7 @@ class $name extends Job {
 
   @override
   Future<void> handle() async {
-    // Process the heavy background task here
-    print('Processing \$runtimeType in the background...');
+    // The queue worker shows a preloader for this job automatically.
   }
 }
 ''';
@@ -648,15 +669,25 @@ void _makeMigration(String name) {
 
 Future<void> _migrateCommand() async {
   await _withDatabaseConnection((connection) async {
-    final count = await FileMigrationRunner(connection).migrate();
-    print(count == 0 ? 'No pending migrations.' : 'Applied $count migration(s).');
+    try {
+      final count = await FileMigrationRunner(connection).migrate();
+      print(count == 0 ? 'No pending migrations.' : 'Applied $count migration(s).');
+    } on StateError catch (e) {
+      print('Error: $e');
+      exitCode = 1;
+    }
   });
 }
 
 Future<void> _migrateRollbackCommand() async {
   await _withDatabaseConnection((connection) async {
-    final ok = await FileMigrationRunner(connection).rollback();
-    print(ok ? 'Rollback complete.' : 'Nothing to roll back.');
+    try {
+      final ok = await FileMigrationRunner(connection).rollback();
+      print(ok ? 'Rollback complete.' : 'Nothing to roll back.');
+    } on StateError catch (e) {
+      print('Error: $e');
+      exitCode = 1;
+    }
   });
 }
 

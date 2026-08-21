@@ -6,16 +6,11 @@ class ProcessTaskJob extends Job {
   ProcessTaskJob(this.taskData);
 
   @override
+  String get label => 'ProcessTask ${taskData['title'] ?? 'untitled'}';
+
+  @override
   Future<void> handle() async {
-    print(
-      '⏳ Background Worker: Processing heavy data for Task [${taskData['title']}]...',
-    );
-
-    // Simulate heavy network or I/O work
-    await Future.delayed(const Duration(seconds: 3));
-
-    print(
-      '✅ Background Worker: Finished processing Task [${taskData['title']}].',
-    );
+    await Future<void>.delayed(const Duration(seconds: 4));
+    await Future<void>.delayed(const Duration(seconds: 4));
   }
 }

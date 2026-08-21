@@ -36,6 +36,7 @@ void main() {
         router.hasRoute(HttpMethod.get, '/quds/insights/health-summary'),
         isFalse,
       );
+      expect(router.hasRoute(HttpMethod.get, '/quds/insights'), isFalse);
     });
 
     test('Storage defaults to local disk', () {
