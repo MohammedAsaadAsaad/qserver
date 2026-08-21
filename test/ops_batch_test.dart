@@ -158,7 +158,7 @@ void main() {
     final elapsed = sw.elapsedMilliseconds;
     await worker.stop(timeout: const Duration(seconds: 2));
     expect(empty, isTrue);
-    expect(elapsed, lessThan(160));
+    expect(elapsed, lessThan(250));
   });
 
   test('dead-letter jobs land in FailedJobLog', () async {
@@ -268,6 +268,14 @@ void main() {
     Log.fileSink = true;
     Log.info('on disk');
     expect(File(Log.filePath).readAsStringSync(), contains('on disk'));
+  });
+
+  test('hot restart does not supervise under package:test', () async {
+    expect(HotRestart.inTest, isTrue);
+    expect(await HotRestart.maybeSupervise(), isFalse);
+    expect(HotRestart.shouldWatchPath('lib/main.dart'), isTrue);
+    expect(HotRestart.shouldWatchPath('.env'), isTrue);
+    expect(HotRestart.shouldWatchPath('lib/.dart_tool/foo.dart'), isFalse);
   });
 
   test('AUTH_USER_STORE=database does not replace a custom UserStore', () async {

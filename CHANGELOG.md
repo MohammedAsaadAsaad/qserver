@@ -1,3 +1,8 @@
+## 0.0.15
+
+- Live monitor defaults to **on** (`QUDS_MONITOR=true`). Set `QUDS_MONITOR=false` for append-only logs. The framed panel still needs a real TTY (not the IDE Debug Console).
+- Local/dev **hot restart** on save (full process respawn). There is no Flutter-style hot reload. `QUDS_HOT_RESTART=false` disables it; skipped under `package:test` and when a debugger is attached.
+
 ## 0.0.14
 
 First pub.dev release since **0.0.10**. Includes the 0.0.11–0.0.13 work below (those versions were never published separately).

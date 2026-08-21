@@ -94,7 +94,7 @@ void _printHelp() {
   print('Quds Server CLI (qserver)');
   print('Usage:');
   print('  qserver create <name>         Scaffolds a new Quds project');
-  print('  qserver serve                 Starts the HTTP server');
+  print('  qserver serve                 Starts the HTTP server (local: hot restart on save)');
   print('  qserver make:controller       Creates a new Controller');
   print('  qserver make:model            Creates a new Model');
   print('  qserver make:request          Creates a new Request class');
@@ -165,7 +165,9 @@ DB_PASSWORD=postgres
 # FILESYSTEM_DISK=gcs
 # BROADCAST_DRIVER=local
 # BROADCAST_DRIVER=redis
-# QUDS_MONITOR=
+QUDS_MONITOR=true
+# QUDS_MONITOR=false
+# QUDS_HOT_RESTART=true
 # QUDS_INSIGHTS=false
 # QUDS_INSIGHTS_TOKEN=
 # HEALTH_WEBHOOK_URL=
@@ -537,7 +539,10 @@ class $name extends QudsFormRequest {
 
 Future<void> _serveCommand() async {
   print('Starting Quds Server...');
-  print('Tip: To start with hot-reload instead, run: dart run --observe lib/main.dart\n');
+  print(
+    'Local/dev hot-restarts on save (full process). '
+    'QUDS_HOT_RESTART=false to disable. There is no Flutter-style hot reload.\n',
+  );
 
   final process = await Process.start(
     'dart',

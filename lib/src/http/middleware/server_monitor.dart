@@ -40,6 +40,7 @@ class ServerMonitor {
   static bool _live = false;
   static bool _altScreen = false;
   static bool _drawPending = false;
+  static bool _noTtyHinted = false;
 
   static const String _reset = '\x1B[0m';
   static const String _gray = '\x1B[90m';
@@ -78,10 +79,10 @@ class ServerMonitor {
   /// True when the in-place panel is actually writing to the terminal.
   static bool get isDrawing => enabled && _live && _shouldDrawTui();
 
-  static bool _shouldDrawTui() {
-    final forced = env<bool>('QUDS_MONITOR');
-    if (forced == false) return false;
-    if (forced == true) return true;
+  /// Live frame is on by default. Set `QUDS_MONITOR=false` to keep line logs.
+  static bool get monitorEnabled => env<bool>('QUDS_MONITOR', true) ?? true;
+
+  static bool _hasTty() {
     try {
       return stdout.hasTerminal;
     } catch (_) {
@@ -89,12 +90,33 @@ class ServerMonitor {
     }
   }
 
+  static bool _shouldDrawTui() {
+    if (!monitorEnabled) return false;
+    // The box needs a real TTY (not VS Code Debug Console / CI pipes).
+    return _hasTty();
+  }
+
+  static void _hintIfNoTty() {
+    if (_noTtyHinted || !enabled || !monitorEnabled || _hasTty()) return;
+    if (!isLocalEnvironment()) return;
+    _noTtyHinted = true;
+    Log.info(
+      'Live monitor is on (default). This process has no TTY so logs stay '
+      'as lines. Run from a terminal or set launch.json '
+      '"console": "integratedTerminal". QUDS_MONITOR=false turns the frame off.',
+      component: 'boot',
+    );
+  }
+
   /// Opens the framed logger as soon as the terminal can host it.
   ///
   /// Call at the start of boot so logs never print outside the box.
   static void attach() {
     if (_live) return;
-    if (!enabled || !_shouldDrawTui()) return;
+    if (!enabled || !_shouldDrawTui()) {
+      _hintIfNoTty();
+      return;
+    }
 
     _live = true;
     _events.clear();
@@ -130,6 +152,7 @@ class ServerMonitor {
     } else {
       cleanup();
     }
+    _noTtyHinted = false;
   }
 
   /// When the panel is drawing, keep the line inside the log pane.

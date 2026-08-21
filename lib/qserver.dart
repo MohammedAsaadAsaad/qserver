@@ -72,6 +72,7 @@ export 'src/testing/quds_test_client.dart';
 export 'src/insights/insights_routes.dart';
 export 'src/insights/insights_dashboard.dart';
 export 'src/insights/metrics_routes.dart';
+export 'src/http/hot_restart.dart';
 export 'package:quds_db_interface/quds_db_interface.dart';
 export 'package:quds_db_postgres/quds_db_postgres.dart';
 export 'package:quds_db_mysql/quds_db_mysql.dart';
@@ -274,6 +275,7 @@ class QudsServerApp {
   }
 
   Future<void> registerProviders(List<ServiceProvider> providers) async {
+    if (await HotRestart.maybeSupervise()) return;
     ServerMonitor.attach();
     Log.boot('Starting application boot');
     await QudsEnv.load();
@@ -346,6 +348,7 @@ class QudsServerApp {
     int? defaultPort,
     bool listenForSignals = true,
   }) async {
+    if (listenForSignals && await HotRestart.maybeSupervise()) return;
     ServerMonitor.attach();
     Log.boot('Preparing HTTP server');
     await QudsEnv.load();

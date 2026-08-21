@@ -13,6 +13,7 @@ void main() {
   tearDown(() {
     Log.reset();
     QudsContainer.clear();
+    QudsEnv.set('QUDS_MONITOR', null);
     ServerMonitor.enabled = true;
     ServerMonitor.endLive();
   });
@@ -76,6 +77,16 @@ void main() {
     await worker.stop(timeout: const Duration(seconds: 2));
 
     expect(lines.any((l) => l.contains('Named work') && l.contains('+')), isTrue);
+  });
+
+  test('monitor is on by default and off when QUDS_MONITOR=false', () {
+    QudsEnv.set('QUDS_MONITOR', null);
+    expect(ServerMonitor.monitorEnabled, isTrue);
+    QudsEnv.set('QUDS_MONITOR', 'false');
+    expect(ServerMonitor.monitorEnabled, isFalse);
+    QudsEnv.set('QUDS_MONITOR', 'true');
+    expect(ServerMonitor.monitorEnabled, isTrue);
+    QudsEnv.set('QUDS_MONITOR', null);
   });
 
   test('monitor does not take the terminal when disabled', () {
