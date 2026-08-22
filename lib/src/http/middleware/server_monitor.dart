@@ -14,9 +14,9 @@ import '../../queue/queue_runtime.dart';
 class ServerMonitor {
   static const int _defaultWidth = 76;
   static const int _eventRing = 200;
-  static const int _trafficRows = 8;
+  static const int _trafficRows = 5;
+  static const int _logRows = 5;
   static const int _errorRows = 3;
-  static const int _defaultEventRows = 14;
   static const int _maxJobRows = 4;
 
   /// Set to false in tests so the dashboard does not take over the terminal.
@@ -38,6 +38,7 @@ class ServerMonitor {
   static String? listenHint;
 
   static bool _live = false;
+  static bool _silentMode = false;
   static bool _altScreen = false;
   static bool _drawPending = false;
   static bool _noTtyHinted = false;
@@ -65,19 +66,21 @@ class ServerMonitor {
     return _defaultWidth;
   }
 
-  static int get _eventRows {
-    try {
-      if (stdout.hasTerminal) {
-        return (stdout.terminalLines - 34).clamp(8, 36);
-      }
-    } catch (_) {}
-    return _defaultEventRows;
+  static String _appName() {
+    final raw = env<String>('APP_NAME', 'Quds Server');
+    final name = raw?.trim();
+    if (name == null || name.isEmpty) return 'Quds Server';
+    return name;
   }
 
   static bool get isLive => _live;
 
   /// True when the in-place panel is actually writing to the terminal.
   static bool get isDrawing => enabled && _live && _shouldDrawTui();
+
+  /// True when line logs must not go to stdout (framed panel or silent buffer).
+  static bool get suppressesLineLogs =>
+      enabled && monitorEnabled && _live && (isDrawing || _silentMode);
 
   /// Live frame is on by default. Set `QUDS_MONITOR=false` to keep line logs.
   static bool get monitorEnabled => env<bool>('QUDS_MONITOR', true) ?? true;
@@ -99,12 +102,12 @@ class ServerMonitor {
   static void _hintIfNoTty() {
     if (_noTtyHinted || !enabled || !monitorEnabled || _hasTty()) return;
     if (!isLocalEnvironment()) return;
+    if (Zone.current[#test.declarer] != null) return;
     _noTtyHinted = true;
-    Log.info(
-      'Live monitor is on (default). This process has no TTY so logs stay '
-      'as lines. Run from a terminal or set launch.json '
-      '"console": "integratedTerminal". QUDS_MONITOR=false turns the frame off.',
-      component: 'boot',
+    stderr.writeln(
+      'qserver: framed monitor needs a real terminal (not Debug Console). '
+      'Use launch.json "console": "integratedTerminal", or run from a terminal. '
+      'Set QUDS_MONITOR=false for plain line logs.',
     );
   }
 
@@ -112,11 +115,13 @@ class ServerMonitor {
   ///
   /// Call at the start of boot so logs never print outside the box.
   static void attach() {
-    if (_live) return;
-    if (!enabled || !_shouldDrawTui()) {
-      _hintIfNoTty();
+    if (_live) {
+      if (_silentMode && _shouldDrawTui()) {
+        _promoteToFramed();
+      }
       return;
     }
+    if (!enabled || !monitorEnabled) return;
 
     _live = true;
     _events.clear();
@@ -127,9 +132,22 @@ class ServerMonitor {
     LogSpinner.onTick = (text, duration) {
       jobIndicator = text;
       jobDuration = duration;
-      _scheduleDraw();
+      if (isDrawing) _scheduleDraw();
     };
 
+    if (_shouldDrawTui()) {
+      _silentMode = false;
+      stdout.write('\x1B[?1049h\x1B[?25l\x1B[H');
+      _altScreen = true;
+      _drawDashboard();
+    } else {
+      _silentMode = true;
+      _hintIfNoTty();
+    }
+  }
+
+  static void _promoteToFramed() {
+    _silentMode = false;
     stdout.write('\x1B[?1049h\x1B[?25l\x1B[H');
     _altScreen = true;
     _drawDashboard();
@@ -142,6 +160,7 @@ class ServerMonitor {
   static void endLive() {
     if (!_live && !_altScreen) return;
     _live = false;
+    _silentMode = false;
     Log.intercept = null;
     LogSpinner.onTick = null;
     jobIndicator = null;
@@ -155,11 +174,11 @@ class ServerMonitor {
     _noTtyHinted = false;
   }
 
-  /// When the panel is drawing, keep the line inside the log pane.
+  /// Buffers log lines for the panel and suppresses stdout line output.
   static bool capture(String line, [Duration? elapsed]) {
-    if (!isDrawing) return false;
+    if (!enabled || !monitorEnabled || !_live) return false;
     _pushEvent(line, elapsed);
-    _scheduleDraw();
+    if (isDrawing) _scheduleDraw();
     return true;
   }
 
@@ -276,8 +295,8 @@ class ServerMonitor {
       items = items.where((e) => e.text.toLowerCase().contains(filter));
     }
     final list = items.toList();
-    if (list.length <= _eventRows) return list;
-    return list.sublist(list.length - _eventRows);
+    if (list.length <= _logRows) return list;
+    return list.sublist(list.length - _logRows);
   }
 
   static String _withDuration(String text, String duration) {
@@ -361,6 +380,52 @@ class ServerMonitor {
     return '$_cyan$left${fill * (_contentWidth + 2)}$right$_reset';
   }
 
+  static String _centeredTitle(String title) {
+    final plainLen = title.length;
+    final pad = ((_contentWidth - plainLen) / 2).floor().clamp(0, _contentWidth);
+    return '$_bold$_cyan${' ' * pad}$title$_reset';
+  }
+
+  /// OSC-8 hyperlink — opens the file when clicked (Windows Terminal, iTerm, …).
+  static String _fileLink(String path) {
+    final absolute = File(path).absolute.path;
+    final uri = Uri.file(absolute).toString();
+    final label = _fit(path, 28);
+    return '\x1B]8;;$uri\x1B\\$_cyan$label$_reset\x1B]8;;\x1B\\';
+  }
+
+  static String _statsLine() {
+    final totalStr = _totalRequests.toString();
+    final successStr = _successCount.toString();
+    final clientErrStr = _clientErrorCount.toString();
+    final serverErrStr = _serverErrorCount.toString();
+    final exceptionStr = ExceptionLog.total.toString();
+    final exColor = ExceptionLog.total > 0 ? _red : _gray;
+    final q = QueueRuntime.snapshot();
+
+    final httpStats =
+        '${_dim}req$_reset $totalStr  ${_green}2xx$_reset $successStr  '
+        '${_yellow}4xx$_reset $clientErrStr  ${_red}5xx$_reset $serverErrStr  '
+        '${exColor}ex$_reset $exceptionStr';
+
+    final queueStats =
+        '${_dim}wait$_reset ${q.waiting}  ${_cyan}run$_reset ${q.running}  '
+        '${_dim}delay$_reset ${q.delayed}  ${_yellow}retry$_reset ${q.retries}  '
+        '${q.failed > 0 ? _red : _dim}dead$_reset ${q.failed}';
+
+    final jobs = _jobRows();
+    final jobStats = jobs.isEmpty
+        ? '${_dim}job idle$_reset'
+        : jobs
+            .map((j) {
+              final (label, dur) = j;
+              return '$_cyan$label$_reset $dur';
+            })
+            .join('  ');
+
+    return '$httpStats  $_dim|$_reset  $queueStats  $_dim|$_reset  $jobStats';
+  }
+
   /// Overwrites the panel in place. Does not clear scrollback (alt screen).
   static void _drawDashboard() {
     if (!isDrawing) return;
@@ -374,52 +439,19 @@ class ServerMonitor {
 
     out.writeln(topBorder);
 
-    final appName = env<String>('APP_NAME') ?? 'Quds Server';
-    final appEnv = env<String>('APP_ENV', 'local') ?? 'local';
-    final titleText = '$_bold$appName$_reset';
-    final right = '$_dim$appEnv$_reset  ${_getUptime()}';
-    final spaces = (_contentWidth -
-            stripAnsi(titleText).length -
-            stripAnsi(right).length)
-        .clamp(0, _contentWidth);
-    _line(out, '$titleText${' ' * spaces}$right');
-    _line(out, _pressureRow());
+    _line(out, _centeredTitle(_appName()));
 
+    final appEnv = env<String>('APP_ENV', 'local') ?? 'local';
     final bind = listenHint ?? 'starting…';
-    _line(out, '$_dim$bind$_reset');
+    _line(
+      out,
+      '$_dim$appEnv$_reset  ${_getUptime()}  $bind',
+    );
+    _line(out, _pressureRow());
 
     out.writeln(midBorder);
 
-    final totalStr = _totalRequests.toString();
-    final successStr = _successCount.toString();
-    final clientErrStr = _clientErrorCount.toString();
-    final serverErrStr = _serverErrorCount.toString();
-    final exceptionStr = ExceptionLog.total.toString();
-    final exColor = ExceptionLog.total > 0 ? _red : _gray;
-    final stats =
-        '${_dim}req$_reset $totalStr  ${_green}2xx$_reset $successStr  '
-        '${_yellow}4xx$_reset $clientErrStr  ${_red}5xx$_reset $serverErrStr  '
-        '${exColor}ex$_reset $exceptionStr';
-    _line(out, stats);
-
-    final q = QueueRuntime.snapshot();
-    _line(
-      out,
-      '${_dim}wait$_reset ${q.waiting}  ${_cyan}run$_reset ${q.running}  '
-      '${_dim}delay$_reset ${q.delayed}  ${_yellow}retry$_reset ${q.retries}  '
-      '${q.failed > 0 ? _red : _dim}dead$_reset ${q.failed}',
-    );
-    final jobs = _jobRows();
-    if (jobs.isEmpty) {
-      _line(out, _withDuration('${_bold}job$_reset   ${_dim}idle$_reset', ''));
-    } else {
-      for (final job in jobs) {
-        _line(
-          out,
-          _withDuration('${_bold}job$_reset   $_cyan${job.$1}$_reset', job.$2),
-        );
-      }
-    }
+    _line(out, _statsLine());
 
     out.writeln(midBorder);
     _line(out, '${_bold}Traffic$_reset');
@@ -433,6 +465,23 @@ class ServerMonitor {
     }
     for (int i = _recentRequests.length; i < _trafficRows; i++) {
       _line(out, '');
+    }
+
+    out.writeln(midBorder);
+    _line(out, _withDuration('${_bold}Log$_reset', '${_dim}Dur$_reset'));
+    final logRows = _visibleEvents();
+    if (logRows.isEmpty) {
+      _line(out, _withDuration('${_dim}Waiting for boot…$_reset', ''));
+      for (int i = 1; i < _logRows; i++) {
+        _line(out, '');
+      }
+    } else {
+      for (final event in logRows) {
+        _line(out, _withDuration(event.text, event.duration));
+      }
+      for (int i = logRows.length; i < _logRows; i++) {
+        _line(out, '');
+      }
     }
 
     out.writeln(midBorder);
@@ -450,29 +499,18 @@ class ServerMonitor {
       for (final record in visible) {
         final time = _hhmmss(record.time);
         final method = record.method.padRight(6);
-        final path = _fit(record.path, 22);
-        final remaining = _contentWidth - (8 + 1 + 6 + 1 + 22 + 1);
-        final summary = _fit(record.summary, remaining);
-        _line(out, '$_red$time$_reset $method $path $summary');
+        final path = _fit(record.path, 18);
+        final summaryWidth = _contentWidth - 8 - 1 - 6 - 1 - 18 - 1 - 30;
+        final summary = _fit(record.summary, summaryWidth.clamp(8, 40));
+        final fileLink = record.detailFilePath != null
+            ? _fileLink(record.detailFilePath!)
+            : '$_dim—$_reset';
+        _line(
+          out,
+          '$_red$time$_reset $method $path $summary $fileLink',
+        );
       }
       for (int i = visible.length; i < _errorRows; i++) {
-        _line(out, '');
-      }
-    }
-
-    out.writeln(midBorder);
-    _line(out, _withDuration('${_bold}Log$_reset', '${_dim}Dur$_reset'));
-    final logRows = _visibleEvents();
-    if (logRows.isEmpty) {
-      _line(out, _withDuration('${_dim}Waiting for boot…$_reset', ''));
-      for (int i = 1; i < _eventRows; i++) {
-        _line(out, '');
-      }
-    } else {
-      for (final event in logRows) {
-        _line(out, _withDuration(event.text, event.duration));
-      }
-      for (int i = logRows.length; i < _eventRows; i++) {
         _line(out, '');
       }
     }

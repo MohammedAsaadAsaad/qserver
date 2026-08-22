@@ -28,7 +28,7 @@ Add `qserver` to your `pubspec.yaml` dependencies:
 
 ```yaml
 dependencies:
-  qserver: ^0.0.15
+  qserver: ^0.0.16
 ```
 
 ---
@@ -116,7 +116,7 @@ Boot and runtime logs look like this (no screen wipe):
 12:03:12.340  INFO   http      Listening on http://0.0.0.0:8000  env=local  pid=1842
 ```
 
-The live monitor is **on by default**. On an interactive TTY it updates in place (the framed panel). Set `QUDS_MONITOR=false` to keep append-only lines. VS Code / Cursor **Debug Console is not a TTY** — use a Terminal or `launch.json` `"console": "integratedTerminal"`. `LOG_LEVEL=debug` adds more detail.
+The live monitor is **on by default**. On an interactive TTY it updates in place (the framed panel) with centered `APP_NAME`, compact stats, and capped Traffic / Log / Exceptions panes. When the monitor is on, line logs are **not** duplicated to stdout. Set `QUDS_MONITOR=false` for append-only lines. VS Code / Cursor **Debug Console is not a TTY** — use a Terminal or `launch.json` `"console": "integratedTerminal"`. `LOG_LEVEL=debug` adds more detail.
 
 In `local` / `dev`, saving a `.dart` or `.env` file **hot-restarts** the process (new `main()`, new routes). Dart has no Flutter-style hot reload for HTTP apps. Set `QUDS_HOT_RESTART=false` to turn it off. While the IDE debugger is attached, use the debugger’s restart control instead.
 

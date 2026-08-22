@@ -1,3 +1,9 @@
+## 0.0.16
+
+- Refine the framed live monitor: centered `APP_NAME`, single-line HTTP/queue stats, last **5** traffic rows, last **5** log lines (Log above Exceptions), last **3** exceptions with clickable `.txt` detail paths (OSC-8).
+- Write per-exception detail files under `storage/logs/exceptions/<id>.txt` (plus the existing aggregate log).
+- When `QUDS_MONITOR=true`, suppress stdout line logs so only the framed panel (or silent buffer) owns output; use `integratedTerminal` in `launch.json` for the panel in VS Code / Cursor.
+
 ## 0.0.15
 
 - Live monitor defaults to **on** (`QUDS_MONITOR=true`). Set `QUDS_MONITOR=false` for append-only logs. The framed panel still needs a real TTY (not the IDE Debug Console).

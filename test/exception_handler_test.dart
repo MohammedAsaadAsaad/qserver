@@ -112,11 +112,18 @@ void main() {
       final file = File(
         '${Directory.systemTemp.path}/qserver_exception_test.log',
       );
+      final detailDir = Directory(
+        '${Directory.systemTemp.path}/qserver_exception_details',
+      );
       if (file.existsSync()) file.deleteSync();
+      if (detailDir.existsSync()) detailDir.deleteSync(recursive: true);
       ExceptionLog.filePath = file.path;
+      ExceptionLog.detailDirectory = detailDir.path;
       addTearDown(() {
         if (file.existsSync()) file.deleteSync();
+        if (detailDir.existsSync()) detailDir.deleteSync(recursive: true);
         ExceptionLog.filePath = 'storage/logs/exceptions.log';
+        ExceptionLog.detailDirectory = 'storage/logs/exceptions';
         ExceptionLog.logToFile = false;
       });
 
@@ -137,6 +144,12 @@ void main() {
       expect(contents, contains('POST /api/v1/tasks from 127.0.0.1'));
       expect(contents, contains('FormatException: bad json'));
       expect(contents, contains('#0 main'));
+
+      expect(ExceptionLog.recent.single.detailFilePath, isNotNull);
+      final detail = File(ExceptionLog.recent.single.detailFilePath!);
+      expect(detail.existsSync(), isTrue);
+      expect(detail.path, endsWith('ex_file.txt'));
+      expect(detail.readAsStringSync(), contains('#0 main'));
     });
   });
 }

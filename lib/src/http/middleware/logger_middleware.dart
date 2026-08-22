@@ -36,7 +36,7 @@ class LoggerMiddleware extends Middleware {
     if (_skipPaths.contains(request.path)) return;
 
     ServerMonitor.log(request, response, stopwatch.elapsedMilliseconds);
-    if (!ServerMonitor.isDrawing) {
+    if (!ServerMonitor.suppressesLineLogs) {
       Log.info(
         '${request.method} ${request.pathAndQuery} → '
         '${response.statusCode} ip=${request.ip}',

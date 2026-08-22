@@ -14,6 +14,9 @@ class QudsExceptionRecord {
   final String message;
   final String stackTrace;
 
+  /// Per-exception `.txt` detail file (when [ExceptionLog.logToFile] is on).
+  final String? detailFilePath;
+
   QudsExceptionRecord({
     required this.id,
     required this.time,
@@ -23,6 +26,7 @@ class QudsExceptionRecord {
     required this.errorType,
     required this.message,
     required this.stackTrace,
+    this.detailFilePath,
   });
 
   factory QudsExceptionRecord.capture(
@@ -77,6 +81,9 @@ class ExceptionLog {
   /// Default log file (Laravel-style). Override in tests or production.
   static String filePath = 'storage/logs/exceptions.log';
 
+  /// Directory for one `.txt` file per exception (clickable in the monitor).
+  static String detailDirectory = 'storage/logs/exceptions';
+
   static int get total => _total;
 
   static List<QudsExceptionRecord> get recent =>
@@ -84,18 +91,54 @@ class ExceptionLog {
 
   static void add(QudsExceptionRecord record) {
     _total++;
-    _records.addLast(record);
-    while (_records.length > maxInMemory) {
-      _records.removeFirst();
-    }
+    String? detailPath;
     if (logToFile) {
       _appendToFile(record);
+      detailPath = _writeDetailFile(record);
+    }
+    _records.addLast(
+      detailPath == null
+          ? record
+          : QudsExceptionRecord(
+              id: record.id,
+              time: record.time,
+              method: record.method,
+              path: record.path,
+              ip: record.ip,
+              errorType: record.errorType,
+              message: record.message,
+              stackTrace: record.stackTrace,
+              detailFilePath: detailPath,
+            ),
+    );
+    while (_records.length > maxInMemory) {
+      _records.removeFirst();
     }
   }
 
   static void clear() {
     _records.clear();
     _total = 0;
+  }
+
+  static String? _writeDetailFile(QudsExceptionRecord record) {
+    try {
+      final dir = Directory(detailDirectory);
+      dir.createSync(recursive: true);
+      final path =
+          '${dir.path}${Platform.pathSeparator}${record.id}.txt';
+      final file = File(path);
+      final stamp = _formatStamp(record.time);
+      final buffer = StringBuffer()
+        ..writeln('[$stamp] ${record.method} ${record.path} from ${record.ip}')
+        ..writeln(record.summary)
+        ..writeln()
+        ..writeln(record.stackTrace);
+      file.writeAsStringSync(buffer.toString());
+      return path;
+    } catch (_) {
+      return null;
+    }
   }
 
   static void _appendToFile(QudsExceptionRecord record) {

@@ -1,0 +1,21 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "example (framed monitor)",
+      "type": "dart",
+      "request": "launch",
+      "program": "lib/main.dart",
+      "cwd": "${workspaceFolder}/example",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "example_messaging backend",
+      "type": "dart",
+      "request": "launch",
+      "program": "lib/main.dart",
+      "cwd": "${workspaceFolder}/example_messaging/backend",
+      "console": "integratedTerminal"
+    }
+  ]
+}

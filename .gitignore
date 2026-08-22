@@ -8,3 +8,11 @@ pubspec.lock
 
 # Ignore compiled executables
 *.exe
+
+# Local runtime output
+storage/
+example/storage/
+example/lib/storage/
+.env
+.env.*
+!.env.example
