@@ -1,3 +1,7 @@
+## 0.0.17
+
+- Patch release (same as 0.0.16); republish after release pipeline setup.
+
 ## 0.0.16
 
 - Refine the framed live monitor: centered `APP_NAME`, single-line HTTP/queue stats, last **5** traffic rows, last **5** log lines (Log above Exceptions), last **3** exceptions with clickable `.txt` detail paths (OSC-8).

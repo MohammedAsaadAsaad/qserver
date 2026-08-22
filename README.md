@@ -28,7 +28,7 @@ Add `qserver` to your `pubspec.yaml` dependencies:
 
 ```yaml
 dependencies:
-  qserver: ^0.0.16
+  qserver: ^0.0.17
 ```
 
 ---
