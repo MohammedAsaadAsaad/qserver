@@ -4,10 +4,19 @@ enum HttpMethod {
   post('POST'),
   put('PUT'),
   patch('PATCH'),
-  delete('DELETE');
+  delete('DELETE'),
+  options('OPTIONS');
 
   final String value;
   const HttpMethod(this.value);
+
+  static HttpMethod? tryParse(String raw) {
+    final method = raw.toUpperCase();
+    for (final value in HttpMethod.values) {
+      if (value.value == method) return value;
+    }
+    return null;
+  }
 }
 
 /// Represents standard MIME/Media Types for automated body parsing

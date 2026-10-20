@@ -146,11 +146,10 @@ class QudsRouter {
 
   /// Dispatches a prepared [QudsRequest] through matching + middleware pipeline.
   Future<QudsResponse> handle(QudsRequest request) async {
-    final methodStr = request.method.toUpperCase();
-    final requestMethod = HttpMethod.values.firstWhere(
-      (m) => m.value == methodStr,
-      orElse: () => throw Exception("Unsupported HTTP Method"),
-    );
+    final requestMethod = HttpMethod.tryParse(request.method);
+    if (requestMethod == null) {
+      return QudsResponse.methodNotAllowed();
+    }
 
     final path = request.path;
     final route = _findRoute(requestMethod, path);
@@ -216,11 +215,16 @@ class QudsRouter {
   }) async {
     QudsRequest? qudsRequest;
     try {
-      final methodStr = rawRequest.method.toUpperCase();
-      final requestMethod = HttpMethod.values.firstWhere(
-        (m) => m.value == methodStr,
-        orElse: () => throw Exception("Unsupported HTTP Method"),
-      );
+      final requestMethod = HttpMethod.tryParse(rawRequest.method);
+      if (requestMethod == null) {
+        try {
+          await rawRequest.drain<void>();
+        } catch (_) {}
+        try {
+          await QudsResponse.methodNotAllowed().send(rawRequest.response);
+        } catch (_) {}
+        return;
+      }
 
       final path = rawRequest.uri.path;
 

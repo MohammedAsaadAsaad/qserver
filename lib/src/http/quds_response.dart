@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'enums.dart';
+
 /// Encodes an object to JSON, formatting DateTime instances to ISO-8601 strings.
 String qudsJsonEncode(dynamic object) {
   return jsonEncode(object, toEncodable: (nonEncodable) {
@@ -66,16 +68,35 @@ class QudsResponse {
     }, status: status);
   }
 
+  factory QudsResponse.methodNotAllowed() {
+    return QudsResponse.error('Method Not Allowed', status: 405)
+      ..headers['Allow'] =
+          HttpMethod.values.map((method) => method.value).join(', ');
+  }
+
   /// Internal method used by the framework to flush data to the client
   Future<void> send(HttpResponse response) async {
-    // If upgraded, do nothing! The WebSocket API now owns the connection.
     if (isUpgraded) return;
 
-    response.statusCode = statusCode;
-    headers.forEach((key, value) {
-      response.headers.set(key, value);
-    });
-    response.write(body);
-    await response.close();
+    try {
+      response.statusCode = statusCode;
+      headers.forEach((key, value) {
+        response.headers.set(key, value);
+      });
+      response.write(body);
+      await response.close();
+    } on HttpException {
+      try {
+        await response.close();
+      } catch (_) {}
+    } on SocketException {
+      try {
+        await response.close();
+      } catch (_) {}
+    } on StateError {
+      try {
+        await response.close();
+      } catch (_) {}
+    }
   }
 }

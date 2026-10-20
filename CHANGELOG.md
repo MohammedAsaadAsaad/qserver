@@ -1,3 +1,9 @@
+## 0.0.18
+
+- Add `HttpMethod.options` and `HttpMethod.tryParse` so unknown methods return **405** with `Allow` instead of throwing.
+- CORS preflight (`OPTIONS`) reaches `CorsMiddleware` instead of failing as an unsupported method.
+- Swallow client-disconnect errors when flushing a response (`HttpException` / `SocketException` / `StateError`).
+
 ## 0.0.17
 
 - Patch release (same as 0.0.16); republish after release pipeline setup.

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:qserver/qserver.dart';
 import 'package:test/test.dart';
 
@@ -70,6 +72,67 @@ void main() {
 
       expect(router.hasRoute(HttpMethod.get, '/api/v1/tasks'), isTrue);
       expect(router.hasRoute(HttpMethod.get, '/tasks'), isFalse);
+    });
+  });
+
+  group('Unsupported HTTP methods', () {
+    setUp(() {
+      ServerMonitor.enabled = false;
+      ExceptionLog.logToFile = false;
+      ExceptionLog.clear();
+    });
+
+    tearDown(() {
+      ExceptionLog.clear();
+      ServerMonitor.enabled = true;
+      ExceptionLog.logToFile = true;
+    });
+
+    test('HEAD returns 405 without logging', () async {
+      final router = QudsRouter();
+      router.get('/ok', (req) async => QudsResponse.text('ok'));
+
+      final res = await router.handle(
+        QudsRequest.synthetic(method: 'HEAD', path: '/ok'),
+      );
+
+      expect(res.statusCode, 405);
+      expect(res.headers['Allow'], contains('GET'));
+      expect(ExceptionLog.recent, isEmpty);
+    });
+
+    test('OPTIONS reaches CORS middleware', () async {
+      final router = QudsRouter();
+      router.use(CorsMiddleware());
+      router.get('/ok', (req) async => QudsResponse.text('ok'));
+
+      final res = await router.handle(
+        QudsRequest.synthetic(method: 'OPTIONS', path: '/ok'),
+      );
+
+      expect(res.statusCode, 204);
+      expect(ExceptionLog.recent, isEmpty);
+    });
+
+    test('dispatch HEAD returns 405 without logging', () async {
+      final router = QudsRouter();
+      router.get('/', (req) async => QudsResponse.text('ok'));
+
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      server.listen(router.dispatch);
+      addTearDown(() => server.close(force: true));
+
+      final client = HttpClient();
+      addTearDown(client.close);
+      final request = await client.openUrl(
+        'HEAD',
+        Uri.parse('http://127.0.0.1:${server.port}/'),
+      );
+      final response = await request.close();
+      await response.drain<void>();
+
+      expect(response.statusCode, 405);
+      expect(ExceptionLog.recent, isEmpty);
     });
   });
 }
