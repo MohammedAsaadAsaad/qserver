@@ -14,8 +14,8 @@ import 'redis_cache_driver.dart';
 class CacheServiceProvider extends ServiceProvider {
   @override
   void register() {
-    final driver = (env<String>('CACHE_DRIVER', 'memory') ?? 'memory')
-        .toLowerCase();
+    final driver =
+        (env<String>('CACHE_DRIVER', 'memory') ?? 'memory').toLowerCase();
     switch (driver) {
       case 'redis':
         QudsContainer.singleton<CacheDriver>(RedisCacheDriver());

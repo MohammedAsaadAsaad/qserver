@@ -15,8 +15,8 @@ class QueueServiceProvider extends ServiceProvider {
     if (!QudsContainer.isRegistered<QueueDriver>()) {
       QudsContainer.singleton<QueueDriver>(MemoryQueueDriver());
     }
-    final driver = (env<String>('QUEUE_DRIVER', 'memory') ?? 'memory')
-        .toLowerCase();
+    final driver =
+        (env<String>('QUEUE_DRIVER', 'memory') ?? 'memory').toLowerCase();
     if (driver == 'memory') {
       Log.debug('Driver memory', component: 'queue');
     }

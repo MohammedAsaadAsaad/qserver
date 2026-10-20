@@ -52,7 +52,8 @@ class EmailAuth {
       ),
     );
 
-    final verifyToken = _purposeToken(user, 'email_verify', const Duration(hours: 24));
+    final verifyToken =
+        _purposeToken(user, 'email_verify', const Duration(hours: 24));
     onVerificationToken?.call(user, verifyToken);
     _offerMail(
       user: user,
@@ -94,7 +95,8 @@ class EmailAuth {
   static Future<void> forgotPassword(String email) async {
     final user = await _store().findByEmail(_normalizeEmail(email));
     if (user == null) return;
-    final token = _purposeToken(user, 'password_reset', const Duration(hours: 2));
+    final token =
+        _purposeToken(user, 'password_reset', const Duration(hours: 2));
     onResetToken?.call(user, token);
     _offerMail(
       user: user,

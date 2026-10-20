@@ -87,7 +87,8 @@ class GcsStorageDisk implements StorageDisk {
         'aud': 'https://oauth2.googleapis.com/token',
         'scope': 'https://www.googleapis.com/auth/devstorage.full_control',
         'iat': now.millisecondsSinceEpoch ~/ 1000,
-        'exp': now.add(const Duration(minutes: 55)).millisecondsSinceEpoch ~/ 1000,
+        'exp':
+            now.add(const Duration(minutes: 55)).millisecondsSinceEpoch ~/ 1000,
       },
     ).sign(RSAPrivateKey(pem), algorithm: JWTAlgorithm.RS256);
 
@@ -166,7 +167,8 @@ class GcsStorageDisk implements StorageDisk {
     final key = path.replaceAll(RegExp(r'^/+'), '');
     final base = publicUrlBase;
     if (base != null && base.isNotEmpty) {
-      final trimmed = base.endsWith('/') ? base.substring(0, base.length - 1) : base;
+      final trimmed =
+          base.endsWith('/') ? base.substring(0, base.length - 1) : base;
       return '$trimmed/$key';
     }
     if (bucket.isEmpty) return null;

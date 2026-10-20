@@ -192,6 +192,19 @@ class QudsRequest {
     return _queryParameters[key];
   }
 
+  /// Cookie value from the `Cookie` header (live or synthetic).
+  String? cookie(String name) {
+    final raw = header('cookie');
+    if (raw == null || raw.isEmpty) return null;
+    for (final part in raw.split(';')) {
+      final idx = part.indexOf('=');
+      if (idx <= 0) continue;
+      if (part.substring(0, idx).trim() != name) continue;
+      return Uri.decodeComponent(part.substring(idx + 1).trim());
+    }
+    return null;
+  }
+
   /// Extracts a single Object of type T directly from the request body
   T? get<T>() {
     if (_rawParsedBody is Map<String, dynamic>) {

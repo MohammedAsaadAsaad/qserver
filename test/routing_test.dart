@@ -6,20 +6,23 @@ import 'package:test/test.dart';
 void main() {
   group('Route Matching and compilation Tests', () {
     test('Static path matching', () {
-      final route = Route(HttpMethod.get, '/tasks', (req) async => QudsResponse.json({}));
+      final route =
+          Route(HttpMethod.get, '/tasks', (req) async => QudsResponse.json({}));
       expect(route.matches(HttpMethod.get, '/tasks'), isTrue);
       expect(route.matches(HttpMethod.post, '/tasks'), isFalse);
       expect(route.matches(HttpMethod.get, '/task'), isFalse);
     });
 
     test('Dynamic path parameter matching', () {
-      final route = Route(HttpMethod.get, '/tasks/{id}/comments/{commentId}', (req) async => QudsResponse.json({}));
+      final route = Route(HttpMethod.get, '/tasks/{id}/comments/{commentId}',
+          (req) async => QudsResponse.json({}));
       expect(route.matches(HttpMethod.get, '/tasks/12/comments/45'), isTrue);
       expect(route.matches(HttpMethod.get, '/tasks/12/comments'), isFalse);
     });
 
     test('Extract parameter values', () {
-      final route = Route(HttpMethod.get, '/tasks/{id}/comments/{commentId}', (req) async => QudsResponse.json({}));
+      final route = Route(HttpMethod.get, '/tasks/{id}/comments/{commentId}',
+          (req) async => QudsResponse.json({}));
       final params = route.extractParams('/tasks/12/comments/45');
       expect(params, isNotEmpty);
       expect(params['id'], '12');

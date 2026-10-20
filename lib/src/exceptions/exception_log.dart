@@ -125,8 +125,7 @@ class ExceptionLog {
     try {
       final dir = Directory(detailDirectory);
       dir.createSync(recursive: true);
-      final path =
-          '${dir.path}${Platform.pathSeparator}${record.id}.txt';
+      final path = '${dir.path}${Platform.pathSeparator}${record.id}.txt';
       final file = File(path);
       final stamp = _formatStamp(record.time);
       final buffer = StringBuffer()

@@ -99,12 +99,58 @@ class S3StorageDisk implements StorageDisk {
     }
   }
 
+  /// AWS Signature Version 4 query-string GET URL. Additive helper.
+  String presignGet(
+    String path, {
+    Duration ttl = const Duration(minutes: 15),
+  }) {
+    _ensureConfigured();
+    final uri = _objectUri(path);
+    final now = DateTime.now().toUtc();
+    final amzDate = _formatAmzDate(now);
+    final dateStamp = amzDate.substring(0, 8);
+    final expires = ttl.inSeconds.clamp(1, 604800);
+    final credentialScope = '$dateStamp/$region/s3/aws4_request';
+    final credential = '$accessKey/$credentialScope';
+    final host = uri.host + (uri.hasPort ? ':${uri.port}' : '');
+    final canonicalUri = uri.path.isEmpty ? '/' : _uriEncodePath(uri.path);
+
+    final query = <String, String>{
+      'X-Amz-Algorithm': 'AWS4-HMAC-SHA256',
+      'X-Amz-Credential': credential,
+      'X-Amz-Date': amzDate,
+      'X-Amz-Expires': '$expires',
+      'X-Amz-SignedHeaders': 'host',
+    };
+    final canonicalQuery = _canonicalQuery(Uri(queryParameters: query));
+    final canonicalRequest = [
+      'GET',
+      canonicalUri,
+      canonicalQuery,
+      'host:$host\n',
+      'host',
+      'UNSIGNED-PAYLOAD',
+    ].join('\n');
+    final stringToSign = [
+      'AWS4-HMAC-SHA256',
+      amzDate,
+      credentialScope,
+      sha256.convert(utf8.encode(canonicalRequest)).toString(),
+    ].join('\n');
+    final signingKey = _getSignatureKey(secretKey, dateStamp, region, 's3');
+    final signature =
+        Hmac(sha256, signingKey).convert(utf8.encode(stringToSign)).toString();
+    query['X-Amz-Signature'] = signature;
+    return uri.replace(queryParameters: query).toString();
+  }
+
   @override
   String? url(String path) {
     final base = publicUrlBase;
     if (base == null || base.isEmpty) return null;
     final key = path.replaceAll(RegExp(r'^/+'), '');
-    final trimmed = base.endsWith('/') ? base.substring(0, base.length - 1) : base;
+    final trimmed =
+        base.endsWith('/') ? base.substring(0, base.length - 1) : base;
     return '$trimmed/$key';
   }
 
@@ -139,9 +185,8 @@ class S3StorageDisk implements StorageDisk {
 
     final signedHeaderNames = headers.keys.map((k) => k.toLowerCase()).toList()
       ..sort();
-    final canonicalHeaders = signedHeaderNames
-        .map((k) => '$k:${headers[k]!.trim()}\n')
-        .join();
+    final canonicalHeaders =
+        signedHeaderNames.map((k) => '$k:${headers[k]!.trim()}\n').join();
     final signedHeaders = signedHeaderNames.join(';');
 
     final canonicalUri = uri.path.isEmpty ? '/' : _uriEncodePath(uri.path);
@@ -164,9 +209,8 @@ class S3StorageDisk implements StorageDisk {
     ].join('\n');
 
     final signingKey = _getSignatureKey(secretKey, dateStamp, region, 's3');
-    final signature = Hmac(sha256, signingKey)
-        .convert(utf8.encode(stringToSign))
-        .toString();
+    final signature =
+        Hmac(sha256, signingKey).convert(utf8.encode(stringToSign)).toString();
 
     headers['authorization'] =
         'AWS4-HMAC-SHA256 Credential=$accessKey/$credentialScope, '
@@ -183,8 +227,7 @@ class S3StorageDisk implements StorageDisk {
     final kDate = Hmac(sha256, utf8.encode('AWS4$key'))
         .convert(utf8.encode(dateStamp))
         .bytes;
-    final kRegion =
-        Hmac(sha256, kDate).convert(utf8.encode(regionName)).bytes;
+    final kRegion = Hmac(sha256, kDate).convert(utf8.encode(regionName)).bytes;
     final kService =
         Hmac(sha256, kRegion).convert(utf8.encode(serviceName)).bytes;
     return Hmac(sha256, kService).convert(utf8.encode('aws4_request')).bytes;

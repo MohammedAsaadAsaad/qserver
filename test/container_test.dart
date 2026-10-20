@@ -32,7 +32,8 @@ void main() {
 
     test('Register and resolve factory bind', () {
       int counter = 0;
-      QudsContainer.bind<TestService>(() => TestService('instance_${counter++}'));
+      QudsContainer.bind<TestService>(
+          () => TestService('instance_${counter++}'));
 
       final resolved1 = QudsContainer.resolve<TestService>();
       final resolved2 = QudsContainer.resolve<TestService>();

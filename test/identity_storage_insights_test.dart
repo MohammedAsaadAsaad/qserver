@@ -89,7 +89,8 @@ void main() {
       await EmailAuth.forgotPassword('u@x.com');
       expect(resetToken, isNotNull);
       expect(
-        await EmailAuth.resetPassword(token: resetToken!, password: 'newpass99'),
+        await EmailAuth.resetPassword(
+            token: resetToken!, password: 'newpass99'),
         isTrue,
       );
       expect(
@@ -189,8 +190,10 @@ void main() {
         }),
       );
 
-      expect(disk.url('avatars/a.png'), 'https://cdn.example/files/avatars/a.png');
-      expect(await disk.put('avatars/a.png', [1, 2]), contains('avatars/a.png'));
+      expect(
+          disk.url('avatars/a.png'), 'https://cdn.example/files/avatars/a.png');
+      expect(
+          await disk.put('avatars/a.png', [1, 2]), contains('avatars/a.png'));
       expect(await disk.exists('avatars/a.png'), isTrue);
       await disk.delete('avatars/a.png');
       expect(seen, containsAll(['POST /upload/storage/v1/b/my-bucket/o']));
@@ -230,7 +233,8 @@ void main() {
   });
 
   group('Insights HTML', () {
-    test('serves login HTML without a token and the dashboard with one', () async {
+    test('serves login HTML without a token and the dashboard with one',
+        () async {
       QudsEnv.set('QUDS_INSIGHTS', 'true');
       QudsEnv.set('QUDS_INSIGHTS_TOKEN', 'secret');
       final router = QudsRouter();

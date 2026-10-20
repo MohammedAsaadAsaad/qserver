@@ -22,8 +22,9 @@ class QudsEnv {
 
     final appEnv = (_vars['APP_ENV'] ?? 'local').trim();
     final parent = File(path).parent.path;
-    final layeredPath =
-        parent == '.' ? '.env.$appEnv' : '$parent${Platform.pathSeparator}.env.$appEnv';
+    final layeredPath = parent == '.'
+        ? '.env.$appEnv'
+        : '$parent${Platform.pathSeparator}.env.$appEnv';
 
     var layeredLoaded = false;
     if (layeredPath != path) {

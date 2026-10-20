@@ -55,8 +55,7 @@ class ProjectInfoDashboard {
       }
     }
 
-    final systemParamsHtml =
-        showDiagnostics ? _renderSystemParameters() : '';
+    final systemParamsHtml = showDiagnostics ? _renderSystemParameters() : '';
     final sidebarHtml =
         showDiagnostics ? _renderSidebar(endpoints: endpoints) : '';
     final statsScript = showDiagnostics ? _statsScript : '';

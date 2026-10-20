@@ -49,7 +49,8 @@ class _UserFake implements DatabaseConnection {
     }
     if (n.contains('WHERE provider =')) {
       return users
-          .where((u) => u['provider'] == params[0] && u['provider_id'] == params[1])
+          .where((u) =>
+              u['provider'] == params[0] && u['provider_id'] == params[1])
           .toList();
     }
     return [];
@@ -219,7 +220,8 @@ void main() {
     expect(again.name, 'Ada L');
   });
 
-  test('metrics route is off by default and on when QUDS_METRICS=true', () async {
+  test('metrics route is off by default and on when QUDS_METRICS=true',
+      () async {
     final off = QudsRouter();
     MetricsRoutes.register(off);
     expect(off.hasRoute(HttpMethod.get, '/quds/metrics'), isFalse);
@@ -278,7 +280,8 @@ void main() {
     expect(HotRestart.shouldWatchPath('lib/.dart_tool/foo.dart'), isFalse);
   });
 
-  test('AUTH_USER_STORE=database does not replace a custom UserStore', () async {
+  test('AUTH_USER_STORE=database does not replace a custom UserStore',
+      () async {
     final custom = _CustomStore();
     QudsContainer.singleton<UserStore>(custom);
     QudsContainer.singleton<DatabaseConnection>(_UserFake());

@@ -13,7 +13,8 @@ import 'serializable_job.dart';
 ///
 /// Jobs stay reserved until [ack] (success) or [release] (retry / fail).
 /// A crash mid-handle no longer deletes the row.
-class DatabaseQueueDriver implements QueueDriver, QueueAcknowledgement, QueueInspect {
+class DatabaseQueueDriver
+    implements QueueDriver, QueueAcknowledgement, QueueInspect {
   final DatabaseConnection connection;
   final Duration reserveTimeout;
   bool _ensured = false;
@@ -65,8 +66,8 @@ CREATE TABLE IF NOT EXISTS quds_failed_jobs (
       );
     }
 
-    final id = job.id ??
-        '${DateTime.now().microsecondsSinceEpoch}_${job.jobType}';
+    final id =
+        job.id ?? '${DateTime.now().microsecondsSinceEpoch}_${job.jobType}';
     job.id = id;
 
     await connection.execute('DELETE FROM quds_jobs WHERE id = ?', [id]);
@@ -227,7 +228,8 @@ WHERE id = ?
       return;
     }
 
-    final jobType = job is SerializableJob ? job.jobType : job.runtimeType.toString();
+    final jobType =
+        job is SerializableJob ? job.jobType : job.runtimeType.toString();
     final payload = job is SerializableJob ? jsonEncode(job.toMap()) : '{}';
     await _failRow(id, jobType, payload, job.attempts, error?.toString());
   }

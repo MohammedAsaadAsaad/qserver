@@ -166,7 +166,9 @@ class Log {
     if (level.index < minLevel.index) return;
 
     final line = format(level, message, component: component);
-    recent.add(elapsed == null ? line : format(level, message, component: component, elapsed: elapsed));
+    recent.add(elapsed == null
+        ? line
+        : format(level, message, component: component, elapsed: elapsed));
     while (recent.length > maxRecent) {
       recent.removeFirst();
     }

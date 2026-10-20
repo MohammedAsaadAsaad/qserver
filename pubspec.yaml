@@ -1,14 +1,23 @@
 name: qserver
-description: A comprehensive, expressive, and type-safe Dart backend framework.
-version: 0.0.18
+description: >-
+  Expressive Dart HTTP framework with routing, JWT auth, queues, WebSockets,
+  storage, and PostgreSQL/MySQL via the Quds DB ecosystem.
+version: 1.0.0
 homepage: https://github.com/MohammedAsaadAsaad/qserver
 repository: https://github.com/MohammedAsaadAsaad/qserver
 issue_tracker: https://github.com/MohammedAsaadAsaad/qserver/issues
+documentation: https://pub.dev/documentation/qserver/latest/
 topics:
   - server
   - http
   - websocket
   - backend
+platforms:
+  linux:
+  windows:
+  macos:
+  android:
+  ios:
 environment:
   sdk: '>=3.0.0 <4.0.0'
 

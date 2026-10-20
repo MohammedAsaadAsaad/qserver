@@ -1,3 +1,10 @@
+/// HTTP backend framework: routing, JWT auth, queues, WebSockets, and storage.
+///
+/// Boot an app with [QudsServerApp], register service providers, then call
+/// [QudsServerApp.serve]. Optional drivers (Redis, S3, SMTP, database auth)
+/// stay off until their environment variables are set.
+library;
+
 import 'dart:async';
 import 'dart:io';
 import 'qserver.dart';
@@ -25,6 +32,21 @@ export 'src/http/middleware/rate_limit_middleware.dart';
 export 'src/http/middleware/security_headers_middleware.dart';
 export 'src/http/middleware/request_id_middleware.dart';
 export 'src/http/middleware/insights_auth_middleware.dart';
+export 'src/http/middleware/compression_middleware.dart';
+export 'src/http/middleware/idempotency_middleware.dart';
+export 'src/http/middleware/cookie_session_middleware.dart';
+export 'src/http/middleware/csrf_middleware.dart';
+export 'src/http/middleware/role_middleware.dart';
+export 'src/http/paginator.dart';
+export 'src/http/sse.dart';
+export 'src/http/static_files.dart';
+export 'src/http/openapi_routes.dart';
+export 'src/http/signed_file_routes.dart';
+export 'src/http/auth/gate.dart';
+export 'src/http/auth/database_token_store.dart';
+export 'src/http/auth/smtp_mailer.dart';
+export 'src/storage/signed_url.dart';
+export 'src/schedule/cron.dart';
 export 'src/exceptions/exception_handler.dart';
 export 'src/exceptions/exception_log.dart';
 export 'src/storage/storage.dart';
@@ -77,16 +99,27 @@ export 'package:quds_db_interface/quds_db_interface.dart';
 export 'package:quds_db_postgres/quds_db_postgres.dart';
 export 'package:quds_db_mysql/quds_db_mysql.dart';
 
+/// Application host: router, providers, runtime limits, and HTTP bind.
 class QudsServerApp {
   static final DateTime _startTime = DateTime.now();
+
+  /// HTTP router used by [serve] and by tests via [QudsTestClient].
   final QudsRouter router = QudsRouter();
   final List<ServiceProvider> _providers = [];
+
+  /// In-flight request tracking and optional backpressure limits.
   final ServerRuntime runtime = ServerRuntime();
 
   /// Opt-in console at `GET /`. Off by default for security.
   bool showWelcomePage = false;
+
+  /// Heading shown on the optional welcome page.
   String? welcomeHeading;
+
+  /// Subheading shown on the optional welcome page.
   String? welcomeSubheading;
+
+  /// Extra cards rendered on the optional welcome page.
   List<DashboardCard>? welcomeCards;
 
   /// Optional Insights authorizer (JWT admin role, etc.). Used when Insights is on.
@@ -101,6 +134,9 @@ class QudsServerApp {
   /// `0` = unlimited (default). Override with `MAX_BODY_BYTES`.
   int maxBodyBytes = 0;
 
+  /// `0` = unlimited (default). Override with `MAX_RSS_BYTES`.
+  int maxRssBytes = 0;
+
   /// Drain window used by [close]. Override with `SHUTDOWN_TIMEOUT_SECONDS`.
   int shutdownTimeoutSeconds = 15;
 
@@ -108,6 +144,7 @@ class QudsServerApp {
   bool _listeningSignals = false;
   bool _envDriversApplied = false;
 
+  /// Registers default memory cache, token, and user stores when none exist.
   QudsServerApp() {
     QudsContainer.singleton<QudsRouter>(router);
     if (!QudsContainer.isRegistered<CacheDriver>()) {
@@ -194,6 +231,29 @@ class QudsServerApp {
         );
       }
     }
+
+    final tokenStore =
+        (env<String>('AUTH_TOKEN_STORE', 'memory') ?? 'memory').toLowerCase();
+    if (tokenStore == 'database') {
+      if (QudsContainer.isRegistered<DatabaseConnection>()) {
+        final current = QudsContainer.isRegistered<TokenStore>()
+            ? QudsContainer.resolve<TokenStore>()
+            : null;
+        if (current == null || current.runtimeType == MemoryTokenStore) {
+          QudsContainer.singleton<TokenStore>(
+            DatabaseTokenStore(QudsContainer.resolve<DatabaseConnection>()),
+          );
+          Log.info('Token store database', component: 'auth');
+        }
+      } else {
+        Log.warning(
+          'AUTH_TOKEN_STORE=database but DatabaseConnection is not registered',
+          component: 'auth',
+        );
+      }
+    }
+
+    SmtpMailer.configureFromEnv();
 
     final migrateOnBoot = env<bool>('MIGRATE_ON_BOOT', false) ?? false;
     if (migrateOnBoot) {
@@ -306,12 +366,14 @@ class QudsServerApp {
         env<int>('REQUEST_TIMEOUT_SECONDS', requestTimeoutSeconds) ??
             requestTimeoutSeconds;
     maxBodyBytes = env<int>('MAX_BODY_BYTES', maxBodyBytes) ?? maxBodyBytes;
+    maxRssBytes = env<int>('MAX_RSS_BYTES', maxRssBytes) ?? maxRssBytes;
     shutdownTimeoutSeconds =
         env<int>('SHUTDOWN_TIMEOUT_SECONDS', shutdownTimeoutSeconds) ??
             shutdownTimeoutSeconds;
 
     runtime.maxConcurrentRequests = maxConcurrentRequests;
     runtime.maxBodyBytes = maxBodyBytes;
+    runtime.maxRssBytes = maxRssBytes;
     runtime.shutdownTimeout = Duration(seconds: shutdownTimeoutSeconds);
     runtime.requestTimeout = requestTimeoutSeconds > 0
         ? Duration(seconds: requestTimeoutSeconds)
@@ -360,6 +422,8 @@ class QudsServerApp {
     InsightsRoutes.authorizer = insightsAuthorizer;
     InsightsRoutes.register(router);
     MetricsRoutes.register(router);
+    OpenApiRoutes.register(router);
+    SignedFileRoutes.register(router);
 
     if (showWelcomePage) {
       _registerWelcomeRoutes();
@@ -369,8 +433,24 @@ class QudsServerApp {
     final port = env<int>('APP_PORT') ?? defaultPort ?? 8000;
     final appEnv = env<String>('APP_ENV', 'local') ?? 'local';
 
-    Log.boot('Binding $host:$port');
-    final server = await HttpServer.bind(host, port);
+    final certPath = env<String>('SSL_CERT') ?? env<String>('TLS_CERT');
+    final keyPath = env<String>('SSL_KEY') ?? env<String>('TLS_KEY');
+    final useTls = certPath != null &&
+        certPath.isNotEmpty &&
+        keyPath != null &&
+        keyPath.isNotEmpty;
+    final scheme = useTls ? 'https' : 'http';
+
+    Log.boot('Binding $scheme://$host:$port');
+    final HttpServer server;
+    if (useTls) {
+      final context = SecurityContext()
+        ..useCertificateChain(certPath)
+        ..usePrivateKey(keyPath);
+      server = await HttpServer.bindSecure(host, port, context);
+    } else {
+      server = await HttpServer.bind(host, port);
+    }
     runtime.server = server;
     runtime.accepting = true;
     _closed = false;
@@ -392,9 +472,9 @@ class QudsServerApp {
       );
     }
 
-    ServerMonitor.listenHint = 'http://$host:$port  pid=$pid';
+    ServerMonitor.listenHint = '$scheme://$host:$port  pid=$pid';
     Log.info(
-      'Listening on http://$host:$port  env=$appEnv  pid=$pid',
+      'Listening on $scheme://$host:$port  env=$appEnv  pid=$pid',
       component: 'http',
     );
 

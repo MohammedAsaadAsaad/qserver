@@ -31,7 +31,7 @@ void main() {
       // String length
       expect(validator.validateRule('field', 'abc'), isNull);
       expect(validator.validateRule('field', 'ab'), isNotNull);
-      
+
       // Numbers
       expect(validator.validateRule('field', 3), isNull);
       expect(validator.validateRule('field', 2), isNotNull);
@@ -42,7 +42,7 @@ void main() {
       // String length
       expect(validator.validateRule('field', 'abcde'), isNull);
       expect(validator.validateRule('field', 'abcdef'), isNotNull);
-      
+
       // Numbers
       expect(validator.validateRule('field', 5), isNull);
       expect(validator.validateRule('field', 6), isNotNull);
@@ -50,7 +50,7 @@ void main() {
 
     test('Fluent chaining validator extensions', () {
       final rule = IsRequired().isString().min(3).max(10);
-      
+
       expect(rule.run('field', 'hello'), isEmpty);
       expect(rule.run('field', 'he'), isNotEmpty);
       expect(rule.run('field', 'hello world too long'), isNotEmpty);

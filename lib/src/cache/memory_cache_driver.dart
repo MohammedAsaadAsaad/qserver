@@ -6,8 +6,7 @@ class _CacheEntry {
 
   _CacheEntry(this.value, this.expiresAt);
 
-  bool get isExpired =>
-      expiresAt != null && DateTime.now().isAfter(expiresAt!);
+  bool get isExpired => expiresAt != null && DateTime.now().isAfter(expiresAt!);
 }
 
 /// In-process cache with optional per-key TTL.

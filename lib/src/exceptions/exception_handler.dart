@@ -14,7 +14,8 @@ class GlobalExceptionHandler {
         error is QudsAuthorizationException ||
         error is QudsPayloadTooLargeException ||
         error is QudsRequestTimeoutException ||
-        error is QudsServiceUnavailableException;
+        error is QudsServiceUnavailableException ||
+        error is QudsUploadException;
   }
 
   static int statusOf(Object error) {
@@ -23,6 +24,7 @@ class GlobalExceptionHandler {
     if (error is QudsPayloadTooLargeException) return 413;
     if (error is QudsRequestTimeoutException) return 504;
     if (error is QudsServiceUnavailableException) return 503;
+    if (error is QudsUploadException) return 422;
     return 500;
   }
 
@@ -79,6 +81,15 @@ class GlobalExceptionHandler {
 
     if (error is QudsServiceUnavailableException) {
       return QudsResponse.error(error.message, status: 503);
+    }
+
+    if (error is QudsUploadException) {
+      return QudsResponse.json({
+        'message': 'The given data was invalid.',
+        'errors': {
+          'file': [error.message],
+        },
+      }, status: 422);
     }
 
     final debug = isLocalEnvironment();

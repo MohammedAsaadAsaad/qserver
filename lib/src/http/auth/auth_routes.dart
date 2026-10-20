@@ -11,7 +11,8 @@ import 'social_auth.dart';
 /// Not registered automatically — call [register] from your app bootstrap.
 class AuthRoutes {
   static void register(QudsRouter router, {String prefix = '/auth'}) {
-    final p = prefix.endsWith('/') ? prefix.substring(0, prefix.length - 1) : prefix;
+    final p =
+        prefix.endsWith('/') ? prefix.substring(0, prefix.length - 1) : prefix;
 
     router.post('$p/register', _register);
     router.post('$p/login', _login);
@@ -86,7 +87,8 @@ class AuthRoutes {
     request.validate({'token': IsRequired().isString()});
     final ok = await EmailAuth.verifyEmail(request.input<String>('token')!);
     if (!ok) {
-      return QudsResponse.error('Invalid or expired verification token.', status: 400);
+      return QudsResponse.error('Invalid or expired verification token.',
+          status: 400);
     }
     return QudsResponse.json({'ok': true});
   }

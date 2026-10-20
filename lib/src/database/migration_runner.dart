@@ -43,16 +43,16 @@ CREATE TABLE IF NOT EXISTS quds_migrations (
     final rows = await connection.query(
       'SELECT id FROM quds_migrations ORDER BY id ASC',
     );
-    return rows.map((r) => r['id']?.toString() ?? '').where((e) => e.isNotEmpty).toList();
+    return rows
+        .map((r) => r['id']?.toString() ?? '')
+        .where((e) => e.isNotEmpty)
+        .toList();
   }
 
   List<Directory> _migrationDirs() {
     final root = Directory(migrationsPath);
     if (!root.existsSync()) return [];
-    final dirs = root
-        .listSync()
-        .whereType<Directory>()
-        .toList()
+    final dirs = root.listSync().whereType<Directory>().toList()
       ..sort((a, b) => a.path.compareTo(b.path));
     return dirs;
   }
@@ -181,8 +181,7 @@ VALUES (?, ?, ?)
   }
 
   Future<void> _deleteStaleLocks() async {
-    final cutoff =
-        DateTime.now().toUtc().subtract(_lockTtl).toIso8601String();
+    final cutoff = DateTime.now().toUtc().subtract(_lockTtl).toIso8601String();
     await connection.execute(
       'DELETE FROM quds_migration_lock WHERE locked_at < ?',
       [cutoff],

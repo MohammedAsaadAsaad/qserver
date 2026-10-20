@@ -16,17 +16,22 @@ class ServerRuntime {
   int maxBodyBytes;
   Duration shutdownTimeout;
 
+  /// `0` = unlimited (default). Set via `MAX_RSS_BYTES`.
+
   HttpServer? server;
   bool accepting = true;
 
   int _active = 0;
   final Set<Future<void>> _inFlight = {};
 
+  int maxRssBytes;
+
   ServerRuntime({
     this.maxConcurrentRequests = 0,
     this.requestTimeout,
     this.maxBodyBytes = 0,
     this.shutdownTimeout = const Duration(seconds: 15),
+    this.maxRssBytes = 0,
   });
 
   int get activeRequests => _active;
@@ -54,6 +59,14 @@ class ServerRuntime {
       await _sendError(
         raw,
         QudsServiceUnavailableException('Server is busy'),
+      );
+      return;
+    }
+
+    if (maxRssBytes > 0 && ProcessInfo.currentRss > maxRssBytes) {
+      await _sendError(
+        raw,
+        QudsServiceUnavailableException('Memory limit reached'),
       );
       return;
     }

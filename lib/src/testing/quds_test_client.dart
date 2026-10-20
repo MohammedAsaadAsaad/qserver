@@ -63,4 +63,19 @@ class QudsTestClient {
       headers: headers,
     );
   }
+
+  Future<QudsResponse> patch(
+    String path, {
+    Map<String, dynamic> body = const {},
+    Map<String, String> query = const {},
+    Map<String, String> headers = const {},
+  }) {
+    return router.dispatchTest(
+      HttpMethod.patch,
+      path,
+      body: body,
+      query: query,
+      headers: headers,
+    );
+  }
 }

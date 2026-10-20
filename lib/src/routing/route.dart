@@ -19,7 +19,14 @@ class Route {
   }
 
   void _compilePath() {
-    String regexPath = path.replaceAllMapped(RegExp(r'\{([a-zA-Z0-9_]+)\}'), (
+    String regexPath = path.replaceAllMapped(
+      RegExp(r'\{\*([a-zA-Z0-9_]+)\}'),
+      (match) {
+        _paramNames.add(match.group(1)!);
+        return r'(.*)';
+      },
+    );
+    regexPath = regexPath.replaceAllMapped(RegExp(r'\{([a-zA-Z0-9_]+)\}'), (
       match,
     ) {
       _paramNames.add(match.group(1)!);

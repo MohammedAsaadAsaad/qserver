@@ -26,7 +26,8 @@ void main() {
       time: DateTime(2026, 8, 21, 12, 3, 15, 42),
       colored: false,
     );
-    expect(line, '12:03:15.042  INFO   http      Listening on http://127.0.0.1:8000');
+    expect(line,
+        '12:03:15.042  INFO   http      Listening on http://127.0.0.1:8000');
   });
 
   test('boot writes through the writer with the boot component', () {
@@ -40,7 +41,8 @@ void main() {
     expect(lines.single, contains('Loading environment'));
   });
 
-  test('spinner logs success and failure without animating when writer is set', () async {
+  test('spinner logs success and failure without animating when writer is set',
+      () async {
     final lines = <String>[];
     Log.color = false;
     Log.writer = lines.add;
@@ -76,7 +78,8 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 50));
     await worker.stop(timeout: const Duration(seconds: 2));
 
-    expect(lines.any((l) => l.contains('Named work') && l.contains('+')), isTrue);
+    expect(
+        lines.any((l) => l.contains('Named work') && l.contains('+')), isTrue);
   });
 
   test('monitor is on by default and off when QUDS_MONITOR=false', () {

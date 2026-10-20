@@ -82,7 +82,8 @@ class QueueWorker {
               );
             }
           } catch (e) {
-            await _handleFailure(job, e, spinner: spinner, elapsed: run.elapsed);
+            await _handleFailure(job, e,
+                spinner: spinner, elapsed: run.elapsed);
           } finally {
             QueueRuntime.end(run);
             ServerMonitor.refresh();
@@ -110,8 +111,7 @@ class QueueWorker {
   }) async {
     if (job.attempts < job.maxRetries) {
       final backoffSeconds = 1 << (job.attempts - 1); // 1, 2, 4, ...
-      job.availableAt =
-          DateTime.now().add(Duration(seconds: backoffSeconds));
+      job.availableAt = DateTime.now().add(Duration(seconds: backoffSeconds));
       QueueRuntime.retries++;
       final detail = 'retry in ${backoffSeconds}s '
           '(${job.attempts}/${job.maxRetries}): $error';

@@ -418,14 +418,16 @@ void main() {
       expect(count, 1);
       expect(fake.tables['quds_migration_lock'], isEmpty);
       expect(
-        fake.tables['quds_migrations']!.any((r) => r['id'] == '_prod_lock_probe'),
+        fake.tables['quds_migrations']!
+            .any((r) => r['id'] == '_prod_lock_probe'),
         isTrue,
       );
     });
   });
 
   group('QudsServerApp.close', () {
-    test('serve returns after close and health stays ok while running', () async {
+    test('serve returns after close and health stays ok while running',
+        () async {
       final app = QudsServerApp();
       app.router.get('/ping', (request) async {
         return QudsResponse.json({'pong': true});
@@ -446,7 +448,8 @@ void main() {
 
       final client = HttpClient();
       addTearDown(client.close);
-      final health = await client.get('127.0.0.1', server!.port, '/quds/health');
+      final health =
+          await client.get('127.0.0.1', server!.port, '/quds/health');
       final healthRes = await health.close();
       expect(healthRes.statusCode, 200);
 

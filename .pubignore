@@ -1,5 +1,8 @@
 # IDE / local tooling
 .vscode/
+doc/api/
+.env
+**/.env
 
 # Exclude the full-stack demo app from the published package.
 # It is a standalone Flutter + backend showcase and is not needed by consumers.
@@ -9,7 +12,10 @@ example_messaging/
 *.exe
 *.exe.old
 
-# Local runtime output
-storage/
+# Runtime output only. A bare `storage/` pattern also matches
+# lib/src/storage/ and dropped those files from 0.0.18 on pub.dev.
+/storage/
+example/storage/
+example/lib/storage/
 **/storage/logs/
 

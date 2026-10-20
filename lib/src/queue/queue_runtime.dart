@@ -19,7 +19,8 @@ class QueueRuntime {
   static final List<RunningJob> _running = [];
   static int retries = 0;
 
-  static List<RunningJob> get running => List<RunningJob>.unmodifiable(_running);
+  static List<RunningJob> get running =>
+      List<RunningJob>.unmodifiable(_running);
 
   static RunningJob begin(Job job) {
     final item = RunningJob(

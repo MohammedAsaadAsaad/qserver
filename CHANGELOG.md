@@ -1,3 +1,23 @@
+## 1.0.0
+
+First stable release. Additive / opt-in APIs — existing JSON maps, global
+middleware, and defaults are unchanged.
+
+- Include `lib/src/storage/` in the published package (`.pubignore` no longer
+  matches that directory). This restores analysis, dartdoc, and platform scoring
+  on pub.dev.
+
+- Pagination helper (`Paginator`) and `QudsResponse.envelope` / `paginated` factories. `QudsResponse.json` still encodes the map you pass.
+- `router.patch` / `router.options` / `router.resource` / `router.staticFiles`. Wildcard `{*path}` matching.
+- Opt-in gzip (`CompressionMiddleware`), SSE (`QudsResponse.sse`), and `Idempotency-Key` replay.
+- Cookie session + CSRF middlewares (must be added per route/group).
+- `Gate` / `RoleMiddleware` / `GateMiddleware`.
+- `DatabaseTokenStore` when `AUTH_TOKEN_STORE=database` (memory remains default; custom stores are not replaced).
+- SMTP `Mailer.send` only when `MAIL_HOST` is set and the app has not already assigned a hook.
+- Upload rules (`UploadedFile.assertAllowed`), HMAC / S3 temporary URLs, `Schedule.cron`.
+- Opt-in `GET /quds/openapi.json` (`QUDS_OPENAPI=true`) and `GET /quds/files` (`QUDS_SIGNED_FILES=true`).
+- TLS bind when `SSL_CERT` + `SSL_KEY` are set. Soft 503 when `MAX_RSS_BYTES` is set and RSS exceeds it.
+
 ## 0.0.18
 
 - Add `HttpMethod.options` and `HttpMethod.tryParse` so unknown methods return **405** with `Allow` instead of throwing.

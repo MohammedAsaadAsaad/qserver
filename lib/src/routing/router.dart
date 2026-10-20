@@ -7,6 +7,7 @@ import '../http/enums.dart';
 import '../http/quds_request.dart';
 import '../http/quds_response.dart';
 import '../http/middleware.dart';
+import '../http/static_files.dart';
 
 class QudsRouter {
   final List<Route> _routes = [];
@@ -111,6 +112,84 @@ class QudsRouter {
         handler,
         middleware: [..._currentGroupMiddleware, ...middleware],
       ),
+    );
+  }
+
+  void patch(
+    String path,
+    RouteHandler handler, {
+    List<Middleware> middleware = const [],
+  }) {
+    _routes.add(
+      Route(
+        HttpMethod.patch,
+        _buildPath(path),
+        handler,
+        middleware: [..._currentGroupMiddleware, ...middleware],
+      ),
+    );
+  }
+
+  void options(
+    String path,
+    RouteHandler handler, {
+    List<Middleware> middleware = const [],
+  }) {
+    _routes.add(
+      Route(
+        HttpMethod.options,
+        _buildPath(path),
+        handler,
+        middleware: [..._currentGroupMiddleware, ...middleware],
+      ),
+    );
+  }
+
+  /// REST resource: `index`/`store` on [path], `show`/`update`/`destroy` on
+  /// `{id}`. Only provided actions are registered.
+  void resource(
+    String path,
+    Map<String, RouteHandler> actions, {
+    List<Middleware> middleware = const [],
+  }) {
+    final base = path.endsWith('/') ? path.substring(0, path.length - 1) : path;
+    final item = '$base/{id}';
+    if (actions['index'] != null) {
+      get(base, actions['index']!, middleware: middleware);
+    }
+    if (actions['store'] != null) {
+      post(base, actions['store']!, middleware: middleware);
+    }
+    if (actions['show'] != null) {
+      get(item, actions['show']!, middleware: middleware);
+    }
+    if (actions['update'] != null) {
+      put(item, actions['update']!, middleware: middleware);
+      patch(item, actions['update']!, middleware: middleware);
+    }
+    if (actions['destroy'] != null) {
+      delete(item, actions['destroy']!, middleware: middleware);
+    }
+  }
+
+  /// Serves files under [urlPrefix] from [directory]. Opt-in route helper.
+  void staticFiles(
+    String urlPrefix,
+    String directory, {
+    List<Middleware> middleware = const [],
+  }) {
+    final prefix = urlPrefix.endsWith('/')
+        ? urlPrefix.substring(0, urlPrefix.length - 1)
+        : urlPrefix;
+    get(
+      prefix,
+      (request) => StaticFiles.serve(directory, 'index.html'),
+      middleware: middleware,
+    );
+    get(
+      '$prefix/{*path}',
+      (request) => StaticFiles.fromRequest(request, directory),
+      middleware: middleware,
     );
   }
 

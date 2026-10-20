@@ -185,9 +185,8 @@ class ServerMonitor {
   static void _pushEvent(String line, [Duration? elapsed]) {
     if (_events.length >= _eventRing) _events.removeFirst();
     final parsed = _splitDuration(line);
-    final duration = elapsed != null
-        ? Log.formatElapsed(elapsed)
-        : parsed.duration;
+    final duration =
+        elapsed != null ? Log.formatElapsed(elapsed) : parsed.duration;
     _events.add(_EventRow(parsed.text, duration));
   }
 
@@ -274,7 +273,9 @@ class ServerMonitor {
       return [(jobIndicator!, jobDuration ?? '')];
     }
     if (live.length == 1 && jobIndicator != null) {
-      return [(jobIndicator!, jobDuration ?? Log.formatElapsed(live.first.elapsed))];
+      return [
+        (jobIndicator!, jobDuration ?? Log.formatElapsed(live.first.elapsed))
+      ];
     }
     return live
         .take(_maxJobRows)
@@ -330,9 +331,8 @@ class ServerMonitor {
         : _responseTimes.reduce((a, b) => a + b) / _responseTimes.length;
     final lat = (avgMs / 800).clamp(0.0, 1.0);
     final faults = _clientErrorCount + _serverErrorCount + ExceptionLog.total;
-    final err = _totalRequests == 0
-        ? 0.0
-        : (faults / _totalRequests).clamp(0.0, 1.0);
+    final err =
+        _totalRequests == 0 ? 0.0 : (faults / _totalRequests).clamp(0.0, 1.0);
     final rss = ProcessInfo.currentRss / (512 * 1024 * 1024);
     final mem = rss.clamp(0.0, 1.0);
     final q = QueueRuntime.snapshot();
@@ -382,7 +382,8 @@ class ServerMonitor {
 
   static String _centeredTitle(String title) {
     final plainLen = title.length;
-    final pad = ((_contentWidth - plainLen) / 2).floor().clamp(0, _contentWidth);
+    final pad =
+        ((_contentWidth - plainLen) / 2).floor().clamp(0, _contentWidth);
     return '$_bold$_cyan${' ' * pad}$title$_reset';
   }
 
@@ -416,12 +417,10 @@ class ServerMonitor {
     final jobs = _jobRows();
     final jobStats = jobs.isEmpty
         ? '${_dim}job idle$_reset'
-        : jobs
-            .map((j) {
-              final (label, dur) = j;
-              return '$_cyan$label$_reset $dur';
-            })
-            .join('  ');
+        : jobs.map((j) {
+            final (label, dur) = j;
+            return '$_cyan$label$_reset $dur';
+          }).join('  ');
 
     return '$httpStats  $_dim|$_reset  $queueStats  $_dim|$_reset  $jobStats';
   }

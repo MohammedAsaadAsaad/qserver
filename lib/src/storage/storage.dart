@@ -3,6 +3,7 @@ import '../logging/quds_log.dart';
 import 'gcs_storage_disk.dart';
 import 'local_storage_disk.dart';
 import 's3_storage_disk.dart';
+import 'signed_url.dart';
 import 'storage_disk.dart';
 
 /// A global facade for managing file storage.
@@ -65,4 +66,17 @@ class Storage {
 
   /// Public URL when supported (S3 via `S3_PUBLIC_URL`); otherwise `null`.
   static String? url(String path) => _disk.url(path);
+
+  /// Time-limited URL. S3 uses SigV4 query auth; other disks use HMAC
+  /// `/quds/files?...` (serve that route only when `QUDS_SIGNED_FILES=true`).
+  static String temporaryUrl(
+    String path, {
+    Duration ttl = const Duration(minutes: 15),
+  }) {
+    final disk = _disk;
+    if (disk is S3StorageDisk) {
+      return disk.presignGet(path, ttl: ttl);
+    }
+    return SignedUrl.issue(path, ttl: ttl);
+  }
 }

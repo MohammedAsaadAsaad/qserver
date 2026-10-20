@@ -82,8 +82,10 @@ class InsightsRoutes {
         (request) async {
           final limit =
               int.tryParse(request.query('limit') ?? '')?.clamp(1, 100) ?? 50;
-          final items =
-              FailedJobLog.recent.reversed.take(limit).map((r) => r.toJson()).toList();
+          final items = FailedJobLog.recent.reversed
+              .take(limit)
+              .map((r) => r.toJson())
+              .toList();
           return QudsResponse.json({
             'total': FailedJobLog.total,
             'count': items.length,

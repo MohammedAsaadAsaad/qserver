@@ -6,8 +6,8 @@ import '../http/auth/auth.dart';
 import '../http/quds_response.dart';
 import '../logging/quds_log.dart';
 
-typedef ChannelAuthCallback =
-    Future<bool> Function(Map<String, dynamic>? user, String channelName);
+typedef ChannelAuthCallback = Future<bool> Function(
+    Map<String, dynamic>? user, String channelName);
 
 class _SocketState {
   DateTime lastActivity;
@@ -50,8 +50,7 @@ class BroadcastManager {
   int get _pingIntervalSeconds =>
       env<int>('WS_PING_INTERVAL_SECONDS', 30) ?? 30;
 
-  int get _idleTimeoutSeconds =>
-      env<int>('WS_IDLE_TIMEOUT_SECONDS', 90) ?? 90;
+  int get _idleTimeoutSeconds => env<int>('WS_IDLE_TIMEOUT_SECONDS', 90) ?? 90;
 
   void _tickMaintenance() {
     final now = DateTime.now();
@@ -201,8 +200,8 @@ class BroadcastManager {
   }
 
   /// Optional hook for Redis (or other) remote fan-out. Set by [RedisBroadcastBridge].
-  Future<void> Function(String channel, String event, Map<String, dynamic> data)?
-      remotePublish;
+  Future<void> Function(
+      String channel, String event, Map<String, dynamic> data)? remotePublish;
 
   /// Pushes an event payload to all clients connected to a specific channel
   void emit(String channel, String event, Map<String, dynamic> data) {

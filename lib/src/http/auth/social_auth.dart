@@ -87,7 +87,8 @@ class SocialAuth {
 
   static Future<AuthUser> _findOrCreate(SocialIdentity identity) async {
     final store = _store();
-    var user = await store.findByProvider(identity.provider, identity.providerId);
+    var user =
+        await store.findByProvider(identity.provider, identity.providerId);
     if (user != null) return user;
 
     if (identity.email != null && identity.email!.isNotEmpty) {
@@ -122,7 +123,8 @@ class SocialAuth {
     );
     final response = await _client.get(uri);
     if (response.statusCode != 200) {
-      throw StateError('Google token verification failed (${response.statusCode})');
+      throw StateError(
+          'Google token verification failed (${response.statusCode})');
     }
     final data = jsonDecode(response.body) as Map<String, dynamic>;
     final expectedAud = env<String>('GOOGLE_CLIENT_ID');
@@ -143,7 +145,8 @@ class SocialAuth {
     );
   }
 
-  static Future<SocialIdentity> defaultAppleVerifier(String identityToken) async {
+  static Future<SocialIdentity> defaultAppleVerifier(
+      String identityToken) async {
     final decoded = JWT.decode(identityToken);
     final kid = decoded.header?['kid']?.toString();
     if (kid == null || kid.isEmpty) {
@@ -154,7 +157,8 @@ class SocialAuth {
       Uri.parse('https://appleid.apple.com/auth/keys'),
     );
     if (keysResponse.statusCode != 200) {
-      throw StateError('Failed to fetch Apple JWKS (${keysResponse.statusCode})');
+      throw StateError(
+          'Failed to fetch Apple JWKS (${keysResponse.statusCode})');
     }
     final body = jsonDecode(keysResponse.body) as Map<String, dynamic>;
     final keys = (body['keys'] as List?)?.cast<Map<String, dynamic>>() ?? [];
@@ -193,7 +197,8 @@ class SocialAuth {
   static Future<SocialIdentity> defaultFirebaseVerifier(String idToken) async {
     final apiKey = env<String>('FIREBASE_API_KEY');
     if (apiKey == null || apiKey.isEmpty) {
-      throw StateError('FIREBASE_API_KEY is required to verify Firebase tokens');
+      throw StateError(
+          'FIREBASE_API_KEY is required to verify Firebase tokens');
     }
     final uri = Uri.parse(
       'https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=$apiKey',

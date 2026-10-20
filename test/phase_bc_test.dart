@@ -31,7 +31,8 @@ void main() {
     test('Insights routes are off by default', () {
       final router = QudsRouter();
       InsightsRoutes.register(router);
-      expect(router.hasRoute(HttpMethod.get, '/quds/insights/exceptions'), isFalse);
+      expect(router.hasRoute(HttpMethod.get, '/quds/insights/exceptions'),
+          isFalse);
       expect(
         router.hasRoute(HttpMethod.get, '/quds/insights/health-summary'),
         isFalse,

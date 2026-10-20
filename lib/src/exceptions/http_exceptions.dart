@@ -21,8 +21,7 @@ class QudsRequestTimeoutException implements Exception {
 
   QudsRequestTimeoutException(this.timeout);
 
-  String get message =>
-      'Request timed out after ${timeout.inMilliseconds}ms.';
+  String get message => 'Request timed out after ${timeout.inMilliseconds}ms.';
 
   @override
   String toString() => message;
@@ -33,6 +32,16 @@ class QudsServiceUnavailableException implements Exception {
   final String message;
 
   QudsServiceUnavailableException(this.message);
+
+  @override
+  String toString() => message;
+}
+
+/// Thrown by [UploadedFile.assertAllowed] when a file fails size/type rules.
+class QudsUploadException implements Exception {
+  final String message;
+
+  QudsUploadException(this.message);
 
   @override
   String toString() => message;
